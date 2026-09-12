@@ -10,3 +10,4 @@ from app.core.models.product import Product, ProductRecipe, RecipeVersion  # noq
 from app.core.models.quote import Quote, QuoteLine, QuoteRevision  # noqa: F401
 from app.core.models.supplier import Supplier, SupplierQuote  # noqa: F401
 from app.core.models.survey import Survey, SurveyObservation  # noqa: F401
+from app.core.models.opportunity import Opportunity  # noqa: F401
