@@ -125,6 +125,27 @@ sequencing (Part 26 assigns it here), not missing data — now in sequence, not 
   aggregate.
 - **5 Capital, Portfolio Mix beyond type/product, Margin Leakage** are not built — they need real
   historical financials, customer-quality signals, or geographic data this repo doesn't have.
+- **Business Time Travel** (Part 14.15) — `quote_gm_summary`/`product_performance_summary`/
+  `revenue_summary` all accept an optional `as_of`, reusing Phase 0's `revision_as_of` rather than
+  reinventing it. Caught a real bug doing this: the existing `archived_at IS NULL` filters would
+  have wrongly excluded a site/quote from a *historical* view if it was archived after the as-of
+  date but was still active back then — fixed with an "active as of" helper.
+
+**Phase 4 (Website Studio) — kernel started**, schema-level only, following Part 9/10/11's
+architecture rather than business-data specifics:
+
+- **WebsiteBranch** (Part 9's Business Git for the website: MAIN → HOME-V2 → FACTORY-EXPERIMENT).
+  Records lineage only — a full diff/merge engine is later work.
+- **WebsitePage/WebsitePageRevision** — the Nth real consumer of the current-row +
+  append-only-revision pattern.
+- **WidgetInstance** — `widget_type` drawn from Part 10's own example list, not a closed enum.
+  `content_source` is a plain descriptive string (`"product:CANOPY"`), **deliberately never a
+  foreign key** into business data — Law 10 requires that deleting a widget instance can never
+  delete canonical business data, and a real FK would tempt a future `ON DELETE CASCADE` to
+  violate that structurally. Proven directly: a widget referencing a real `Product` survives the
+  widget's own removal, and so does the `Product`.
+- Full drag-and-drop editing, publishing workflow, diff/merge, and real widget rendering are not
+  built — this is the data model only.
 
 ## Layout
 
@@ -132,16 +153,16 @@ sequencing (Part 26 assigns it here), not missing data — now in sequence, not 
 app/
   core/     settings, DB engine, ORM models (identity, party, project, event, feature_flag,
             product, quote, supplier, survey, opportunity, critical_spec, confirmation,
-            site_quality_flag)
+            site_quality_flag, website)
   domain/   business engine -- revisioning, archiving, events, calculations, time_travel,
             authorization, feature_flags, state_machine, project_lifecycle, projects, recipes,
             pricing, constitution, quotes, fresh_price, suppliers, site_knowledge,
             business_health, opportunities, critical_specs, canopy_recipe, canopy_configurator,
-            confirmations, what_if, unknown_radar, next_best_action, site_quality
+            confirmations, what_if, unknown_radar, next_best_action, site_quality, website
   api/      presentation layer (empty -- no real endpoints until real auth exists)
   main.py   FastAPI app (currently: GET /health only)
-migrations/ Alembic migration scripts (18, baseline through site quality flags)
-tests/      139 tests across all of the above, all passing against both SQLite (CI) and real
+migrations/ Alembic migration scripts (19, baseline through Website Studio kernel)
+tests/      147 tests across all of the above, all passing against both SQLite (CI) and real
             Postgres (verified manually before every commit -- see git log)
 ```
 
