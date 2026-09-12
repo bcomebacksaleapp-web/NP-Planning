@@ -181,9 +181,13 @@ holding only the former gets a real `403` attempting the latter (proven directly
 | `POST /sites/{id}/quality-flags`, `GET .../quality`, `POST /quality-flags/{id}/resolve` | `site_quality.py` |
 | `GET /sites/{id}/knowledge`, `.../survey-checklist` | `site_knowledge.py`, `unknown_radar.py` |
 
-**Not yet exposed via API** (still domain-layer-only, same as everything above was before this
-round): Website Studio (branch/page/widget CRUD), Supplier actual-procurement recording, Product
-Recipe versioning.
+**Every domain module now has API coverage** — Website Studio (`POST /website/branches`,
+`POST /website/pages`, `PUT /website/pages/{id}`, `POST /website/pages/{id}/restore`), Supplier
+procurement (`POST /suppliers/quotes/{id}/actual-procurement`), and Product Recipe versioning
+(`POST /recipes`, `PUT /recipes/{id}`, `POST /recipes/{id}/restore`) closed out the last three.
+28 routes total. What's left needing real input is unchanged: the Canopy takeoff formula, real
+supplier pricing, real historical job/financial data, or an actual frontend — none of which more
+API wiring can substitute for.
 
 ## Layout
 
@@ -199,10 +203,10 @@ app/
             confirmations, what_if, unknown_radar, next_best_action, site_quality, website, auth
   api/      presentation layer -- deps.py (get_current_user/require_permission), routers/
             (auth, business, canopy, quotes, opportunities, critical_specs, site_quality,
-            site_knowledge) -- 20 routes total, see the table above
+            site_knowledge, website, suppliers, recipes) -- 28 routes total
   main.py   FastAPI app wiring all routers together
 migrations/ Alembic migration scripts (20, baseline through real authentication)
-tests/      184 tests across all of the above, all passing against both SQLite (CI) and real
+tests/      190 tests across all of the above, all passing against both SQLite (CI) and real
             Postgres (verified manually before every commit -- see git log)
 ```
 
