@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -8,4 +10,15 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
 class Base(DeclarativeBase):
-    """Shared declarative base. Sprint 0.1 defines no tables yet -- entities land in Sprint 0.2."""
+    """Shared declarative base for all ORM entities."""
+
+
+def utcnow() -> datetime:
+    """Client-side timestamp default, deliberately not a DB server_default.
+
+    A server_default like `now()` gets compiled into migration DDL as a dialect-specific
+    literal (Postgres' `now()` isn't valid SQLite DDL), which breaks the SQLite-based
+    migration smoke test in tests/test_migrations.py. A Python-side default sidesteps that
+    entirely and behaves identically across dialects.
+    """
+    return datetime.now(timezone.utc)
