@@ -1,9 +1,11 @@
+import pytest
 from sqlalchemy import select
 
 from app.core.models.party import Customer, Site
 from app.core.models.project import Project, ProjectRevision
 from app.core.models.quote import Quote, QuoteRevision
 from app.domain.canopy_configurator import configure_canopy_and_create_quote
+from app.domain.fresh_price import PriceQuote
 from app.domain.revisioning import latest_revision
 
 
@@ -79,6 +81,46 @@ def test_quote_gate_never_shows_pass_while_the_quantity_is_a_placeholder(session
     assert current.gate_status != "PASS"
     assert current.gate_status == "OVERRIDE_REQUIRED"
     assert "quantity basis" in current.gate_note.lower()
+
+
+def test_configurator_derives_unit_cost_from_supplier_quotes_via_fresh_price(session):
+    """Wires Sprint 1's Smart Fresh Price selection into the actual quote pipeline instead of a
+    bare manual number -- a 90-day lock requirement must select the pricier-but-long-enough
+    quote, exactly as app.domain.fresh_price's own tests already prove in isolation."""
+    site = _make_site(session)
+    quotes = [
+        PriceQuote(price=1400.0, lock_days=30, source="Supplier A"),
+        PriceQuote(price=1500.0, lock_days=60, source="Supplier B"),
+        PriceQuote(price=1600.0, lock_days=90, source="Supplier C"),
+    ]
+
+    project, quote = configure_canopy_and_create_quote(
+        session, site.id, width_m=6.0, length_m=4.0, roof_cover="Metal Sheet",
+        supplier_price_quotes=quotes, required_lock_days=90,
+    )
+    session.commit()
+
+    revision = latest_revision(session, ProjectRevision, "project_id", project.id)
+    assert revision.data["unit_cost_per_m2"] == 1600.0  # Supplier C -- only one meeting the lock requirement
+
+    current = latest_revision(session, QuoteRevision, "quote_id", quote.id)
+    assert current.lines[0].unit_price == 1600.0
+
+
+def test_configurator_rejects_both_or_neither_cost_source(session):
+    site = _make_site(session)
+    quotes = [PriceQuote(price=1500.0, lock_days=60, source="Supplier B")]
+
+    with pytest.raises(ValueError):
+        configure_canopy_and_create_quote(
+            session, site.id, width_m=6.0, length_m=4.0, roof_cover="Metal Sheet",
+        )  # neither supplied
+
+    with pytest.raises(ValueError):
+        configure_canopy_and_create_quote(
+            session, site.id, width_m=6.0, length_m=4.0, roof_cover="Metal Sheet",
+            unit_cost_per_m2=1500.0, supplier_price_quotes=quotes,
+        )  # both supplied
 
 
 def test_structural_sizing_never_appears_as_a_number_anywhere_in_the_pipeline(session):
