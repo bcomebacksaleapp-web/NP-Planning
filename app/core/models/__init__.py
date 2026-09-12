@@ -12,3 +12,4 @@ from app.core.models.supplier import Supplier, SupplierQuote  # noqa: F401
 from app.core.models.survey import Survey, SurveyObservation  # noqa: F401
 from app.core.models.opportunity import Opportunity  # noqa: F401
 from app.core.models.critical_spec import CriticalSpec  # noqa: F401
+from app.core.models.confirmation import Confirmation  # noqa: F401
