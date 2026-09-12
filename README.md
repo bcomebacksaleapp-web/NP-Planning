@@ -5,20 +5,45 @@ modes on one shared data layer). See project conversation history for the full M
 
 ## Status
 
-**Sprint 0.1 — repo scaffold + migration pipeline.** No business entities, no auth, no UI beyond a
-health check. The only thing this sprint proves is that the migration tool works and every
-migration is reversible, before anything depends on it.
+**Phase 0 (platform kernel) complete — Sprints 0.1 through 0.8.** No business features yet (that's
+Phase 1: Canopy end-to-end) — this phase exists purely to prove the data/migration foundation is
+safe before anything real is built on top of it. What's here:
+
+- **Migration pipeline** (0.1): Alembic, every migration reversible, enforced in CI.
+- **Core identity/party entities** (0.2): `User`/`Role`/`Permission` (RBAC skeleton, six roles
+  seeded), `Customer`/`Site`.
+- **Revision pattern** (0.3): current row + append-only revision table (`Project`/
+  `ProjectRevision`). Restore always creates a new revision, never rewrites history.
+- **Archive framework** (0.4): soft-delete via `archived_at`, never hard-delete, no cascade.
+- **Event log + calculation lineage + Time Travel** (0.5): one append-only `Event` table doubling
+  as both audit trail and event stream; `make_derived_value()` for engine-versioned calculated
+  values; `revision_as_of()` for "what was known as of date X".
+- **Authorization check** (0.6): `has_permission()` domain logic only — not wired into HTTP
+  request handling yet, since there's no real endpoint to protect and no real auth infrastructure.
+- **Feature flags** (0.7): fail-closed on an unknown key.
+- **Generic state machine** (0.8): reusable transition-graph engine, wired to `Project`'s 14-state
+  lifecycle (Part 23).
+
+All of the Blueprint's own Phase 0 acceptance criteria pass (see `tests/`): create a record, migrate
+the schema, read it back, restore an old revision as a new one, archive and recover a record,
+preserve a historical calculation while recomputing it separately with a newer engine version.
+
+Two dialect-portability bugs were found and fixed by actually testing every migration against both
+SQLite (fast, CI) and real Postgres (the target dialect), not just one — see git log for both.
 
 ## Layout
 
 ```
 app/
-  core/     settings + DB engine (single place the DB URL is configured)
-  domain/   business engine (empty until Sprint 0.2+)
-  api/      presentation layer (empty until Sprint 0.2+)
+  core/     settings, DB engine, ORM models (models/identity.py, party.py, project.py, event.py,
+            feature_flag.py)
+  domain/   business engine -- revisioning, archiving, events, calculations, time_travel,
+            authorization, feature_flags, state_machine, project_lifecycle, projects
+  api/      presentation layer (empty -- no real endpoints until Phase 1)
   main.py   FastAPI app (currently: GET /health only)
-migrations/ Alembic migration scripts
-tests/
+migrations/ Alembic migration scripts (8, baseline through project lifecycle state)
+tests/      37 tests: models, revisioning, archiving, events, calculations, time travel,
+            authorization, feature flags, state machine, project lifecycle, migrations, health
 ```
 
 ## Local setup
