@@ -6,3 +6,4 @@ from app.core.models.party import Customer, Site  # noqa: F401
 from app.core.models.project import Project, ProjectRevision  # noqa: F401
 from app.core.models.event import Event  # noqa: F401
 from app.core.models.feature_flag import FeatureFlag  # noqa: F401
+from app.core.models.product import Product, ProductRecipe, RecipeVersion  # noqa: F401
