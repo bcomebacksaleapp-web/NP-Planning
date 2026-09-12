@@ -91,6 +91,23 @@ text directly:
   protect yet, and a placeholder auth mechanism would be security theater.
 - A real Customer Mode UI — this is all domain-layer logic, proven by tests, not a webpage.
 
+**Phase 2 (Agent Intelligence) — underway**, since Phase 1 is complete against its own checklist:
+
+- **What-if Simulator** (Part 13.8) — pure re-evaluation of the existing GM30/gate logic under a
+  hypothetical, tested against the Blueprint's own examples verbatim ("What if material price
+  rises 8%?", "What if we discount 5%?").
+- **Unknown Radar + Survey Mission** (Part 13.3/13.4) — `KNOWN`/`PARTIAL`/`UNKNOWN` classification
+  over `SurveyObservation`'s existing fields, not an invented threshold. `survey_checklist()` takes
+  the relevant knowledge types as a caller-supplied list rather than hardcoding which ones matter
+  per product.
+- **Next Best Action** (Part 13.1) — reacts only to structural facts this system already records
+  and has tested (`Quote.gate_status`, `CriticalSpec.state`); has nothing to say about a situation
+  not already covered by an existing gate. `allowed_next_action` is capped at `SUGGEST`/`DRAFT`,
+  tested explicitly (Law 14: never `COMMIT`-level autonomy).
+- **Value of Information** (Part 13.5) is not built — it needs real economic-impact modeling
+  (estimating cost/risk exposure of an unknown), which runs into the same real-data wall as the
+  Canopy takeoff formula.
+
 ## Layout
 
 ```
@@ -101,11 +118,11 @@ app/
             authorization, feature_flags, state_machine, project_lifecycle, projects, recipes,
             pricing, constitution, quotes, fresh_price, suppliers, site_knowledge,
             business_health, opportunities, critical_specs, canopy_recipe, canopy_configurator,
-            confirmations
+            confirmations, what_if, unknown_radar, next_best_action
   api/      presentation layer (empty -- no real endpoints until real auth exists)
   main.py   FastAPI app (currently: GET /health only)
 migrations/ Alembic migration scripts (17, baseline through linking quote lines to product)
-tests/      113 tests across all of the above, all passing against both SQLite (CI) and real
+tests/      128 tests across all of the above, all passing against both SQLite (CI) and real
             Postgres (verified manually before every commit -- see git log)
 ```
 
