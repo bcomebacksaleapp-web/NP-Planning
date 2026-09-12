@@ -19,6 +19,13 @@ from app.core.models.identity import User
 from app.core.models.session_token import SessionToken
 
 SESSION_DURATION_HOURS = 12
+MAX_PASSWORD_BYTES = 72  # bcrypt silently ignores anything beyond this -- reject rather than
+# accept a password that doesn't fully count, which is worse than just saying so up front.
+
+# A precomputed hash of a value nobody can ever type, used only to give login() something to
+# bcrypt-compare against when the email doesn't match a real user (see the timing-attack note
+# on login() below). Never used to authenticate anyone.
+_DUMMY_HASH = bcrypt.hashpw(b"no-such-user-dummy-hash", bcrypt.gensalt()).decode()
 
 
 class InvalidCredentialsError(Exception):
@@ -38,6 +45,8 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
 
 
 def set_password(session: Session, user: User, plain_password: str) -> None:
+    if len(plain_password.encode()) > MAX_PASSWORD_BYTES:
+        raise ValueError(f"Password exceeds bcrypt's {MAX_PASSWORD_BYTES}-byte limit")
     user.password_hash = hash_password(plain_password)
     session.flush()
 
@@ -62,12 +71,24 @@ def login(session: Session, email: str, plain_password: str) -> str:
     """Verifies credentials and issues a new session token. Returns the RAW token -- only its
     hash is ever persisted, so this is the one moment the raw value exists in memory. Losing it
     means logging in again, not an unrecoverable session (that's the intended trade-off).
+
+    Always runs a bcrypt comparison, even when no such user/password exists, against a fixed
+    dummy hash (_DUMMY_HASH) -- short-circuiting on "user not found" without paying bcrypt's cost
+    made an unknown email respond ~160x faster than a known one with a wrong password in
+    practice, letting an attacker enumerate valid emails purely by timing the response. Real
+    users/hashes still go through verify_password unchanged; only the "nothing to compare
+    against" case gets a decoy comparison instead of skipping the work.
     """
     user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
-    if user is None or user.password_hash is None or not verify_password(plain_password, user.password_hash):
+    password_hash = user.password_hash if user is not None and user.password_hash is not None else _DUMMY_HASH
+    password_ok = verify_password(plain_password, password_hash)
+
+    if user is None or user.password_hash is None or not password_ok:
         raise InvalidCredentialsError("Invalid email or password")
     if user.archived_at is not None:
         raise InvalidCredentialsError("Account is archived")
+    if not user.is_active:
+        raise InvalidCredentialsError("Account is inactive")
 
     raw_token = secrets.token_urlsafe(32)
     session.add(
@@ -95,7 +116,7 @@ def resolve_session(session: Session, raw_token: str) -> User:
         raise InvalidSessionError("Session has expired")
 
     user = session.get(User, token.user_id)
-    if user is None or user.archived_at is not None:
+    if user is None or user.archived_at is not None or not user.is_active:
         raise InvalidSessionError("User is no longer active")
     return user
 
