@@ -31,9 +31,12 @@ preserve a historical calculation while recomputing it separately with a newer e
 Two dialect-portability bugs were found and fixed by actually testing every migration against both
 SQLite (fast, CI) and real Postgres (the target dialect), not just one — see git log for both.
 
-**Phase 1 (Canopy end-to-end) — kernel pieces only, blocked on real business data for the rest.**
-Everything the Blueprint specifies with exact numbers, worked examples, or explicit field lists is
-built and tested against that source text directly:
+**Phase 1 (Canopy end-to-end) — Part 26's own checklist fully covered**, modulo one explicit,
+labeled placeholder (see below). Customer: configurator. Agent: lead/site, survey, site knowledge,
+canopy recipe, quantity, cost, suppliers, fresh price, GM30, quote, confirmation. Business:
+pipeline, GM, site capture, basic product performance. Everything the Blueprint specifies with
+exact numbers, worked examples, or explicit field lists is built and tested against that source
+text directly:
 
 - **Product/ProductRecipe/RecipeVersion** — versioned recipe container (Part 21), reusing the
   Phase 0 revision pattern as its second real consumer.
@@ -54,30 +57,36 @@ built and tested against that source text directly:
   definitions or state chains, plus `combine_gate_statuses()`: the actual enforcement of
   "a high score cannot compensate for a hard block" (Part 5), not just a comment saying so.
 - **Opportunity** — lead capture, converting into a real Project.
+- **Confirmation** (Part 6) — what was actually confirmed, not just a Project state name: which
+  quote revision, confirmed by whom. A `BLOCKED` quote can never be confirmed (Part 5: no
+  commercial override on a hard block); an `OVERRIDE_REQUIRED` one needs an explicit
+  `override_reason` or the call is refused (Law 12: who/why).
 - **Canopy configurator, end to end** — `configure_canopy_and_create_quote()` takes customer
-  dimensions and a roof-cover choice and produces real `Project`/`ProjectRevision`/`Quote`/
-  `QuoteRevision`/`QuoteLine` rows with a real GM30 gate decision, verified by re-fetching from
-  the database by id (not just checking a return value) — directly proving Phase 1's own
-  acceptance criterion: "Customer configuration must generate canonical business data, not
-  UI-only data." **The quantity formula itself is an explicitly-labeled placeholder** (see below)
-  — no real canopy BOQ methodology exists anywhere on this machine (confirmed by searching every
-  other project); built on your direction to prove the pipeline while being unmistakable that the
-  numbers aren't real.
+  dimensions and a roof-cover choice, derives its unit cost either directly or via real Smart
+  Fresh Price supplier-quote selection, and produces real `Project`/`ProjectRevision`/`Quote`/
+  `QuoteRevision`/`QuoteLine` rows (each line linked to a real `Product`) with a real, *honest*
+  gate decision — combining C2 (GM30) with C3 (quantity basis), so a placeholder-quantity quote
+  can never show a clean `PASS` just because its margin happens to clear 30%. Verified by
+  re-fetching from the database by id, not just checking a return value — directly proving Phase
+  1's own acceptance criterion: "Customer configuration must generate canonical business data,
+  not UI-only data."
 
 **Still deliberately not built:**
 - **Real canopy quantities.** `app/domain/canopy_recipe.py`'s formula is generic, illustrative
   geometry (`roof_area_m2 = width × length`, a round 5% waste factor) tagged
   `UNVERIFIED_PLACEHOLDER` *inside the stored data itself*, not just in a docstring — the warning
-  survives being read out of the database later. Replace before any real quote is issued.
+  survives being read out of the database later, and its C3 gate keeps every quote built on it
+  honestly flagged until it's replaced. No real canopy BOQ methodology exists anywhere on this
+  machine (confirmed by searching every other project). Replace before any real quote is issued.
 - **Structural sizing** (column/beam/rafter) — never computed, placeholder or not.
   `structure_sizing_status` is always `"PENDING_ENGINEER_CONFIRMATION"`. Part 22 requires a
   qualified engineer to determine this from geometry + load; Law 13 doesn't relax for a
   "just testing" label.
-- **Real supplier pricing data.**
-- C3/C4 (tied to the still-placeholder quantity engine) and C8/C10 — not blocked on data, but on
-  phase sequencing: Part 26 assigns them to Phase 5 (Learning Loop) and Phase 3 (Business Mode)
-  respectively, not Phase 1. The full weighted Constitution Health composite (Part 5 Step 3) is
-  deferred for the same reason as C3/C4/C8/C10 — most of its ten inputs aren't real yet.
+- **Real supplier pricing data** — the Fresh Price wiring exists; no real `SupplierQuote` rows
+  have been entered yet.
+- C4/C8/C10 and the full weighted Constitution Health composite (Part 5 Step 3) — not blocked on
+  data, but on phase sequencing: Part 26 assigns C8/C10 to Phase 5 and Phase 3 respectively, not
+  Phase 1, and the composite needs all ten gates real first.
 - Any HTTP endpoint beyond `/health`, and real login/session auth — no real endpoint exists to
   protect yet, and a placeholder auth mechanism would be security theater.
 - A real Customer Mode UI — this is all domain-layer logic, proven by tests, not a webpage.
@@ -87,15 +96,16 @@ built and tested against that source text directly:
 ```
 app/
   core/     settings, DB engine, ORM models (identity, party, project, event, feature_flag,
-            product, quote, supplier, survey, opportunity, critical_spec)
+            product, quote, supplier, survey, opportunity, critical_spec, confirmation)
   domain/   business engine -- revisioning, archiving, events, calculations, time_travel,
             authorization, feature_flags, state_machine, project_lifecycle, projects, recipes,
             pricing, constitution, quotes, fresh_price, suppliers, site_knowledge,
-            business_health, opportunities, critical_specs, canopy_recipe, canopy_configurator
+            business_health, opportunities, critical_specs, canopy_recipe, canopy_configurator,
+            confirmations
   api/      presentation layer (empty -- no real endpoints until real auth exists)
   main.py   FastAPI app (currently: GET /health only)
-migrations/ Alembic migration scripts (15, baseline through critical spec confirmation)
-tests/      98 tests across all of the above, all passing against both SQLite (CI) and real
+migrations/ Alembic migration scripts (17, baseline through linking quote lines to product)
+tests/      113 tests across all of the above, all passing against both SQLite (CI) and real
             Postgres (verified manually before every commit -- see git log)
 ```
 
