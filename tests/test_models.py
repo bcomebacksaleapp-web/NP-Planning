@@ -1,31 +1,12 @@
 import uuid
 
 import pytest
-from sqlalchemy import create_engine, event
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
 
-from app.core.db import Base
 from app.core.models.identity import Permission, Role, RolePermission, User
 from app.core.models.party import Customer, Site
 
-
-@pytest.fixture()
-def session():
-    # In-memory SQLite, one connection for the whole test via StaticPool -- otherwise each
-    # checkout gets a fresh :memory: database and the schema created below would vanish.
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-
-    # SQLite ignores FOREIGN KEY constraints unless explicitly turned on per-connection --
-    # without this, test_site_rejects_unknown_customer would pass for the wrong reason.
-    @event.listens_for(engine, "connect")
-    def _enable_fk(dbapi_connection, _):
-        dbapi_connection.execute("PRAGMA foreign_keys=ON")
-
-    Base.metadata.create_all(engine)
-    with Session(engine) as s:
-        yield s
+# `session` fixture lives in tests/conftest.py -- shared with tests/test_revisioning.py.
 
 
 def test_user_requires_unique_email(session):
