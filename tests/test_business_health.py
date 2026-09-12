@@ -1,8 +1,10 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
+from app.core.models.confirmation import Confirmation
 from app.core.models.party import Customer, Site
 from app.core.models.product import Product
 from app.core.models.project import PROJECT_STATES
+from app.core.models.quote import Quote, QuoteRevision
 from app.core.models.supplier import Supplier, SupplierQuote
 from app.domain.archiving import archive
 from app.domain.business_health import (
@@ -15,7 +17,8 @@ from app.domain.business_health import (
     supplier_concentration_summary,
 )
 from app.domain.confirmations import confirm_project
-from app.domain.pricing import selling_price_for_gm30
+from app.domain.constitution import evaluate_gm30_gate
+from app.domain.pricing import gross_margin_percent, selling_price_for_gm30
 from app.domain.project_lifecycle import transition_project
 from app.domain.projects import create_project
 from app.domain.quotes import create_quote, update_quote
@@ -268,3 +271,67 @@ def test_supplier_concentration_summary_tracks_materials_independently(session):
     summary = supplier_concentration_summary(session)
     assert set(summary.keys()) == {"Metal Sheet", "Polycarbonate"}
     assert summary["Metal Sheet"]["top_supplier_share_percent"] == 100.0
+
+
+def _price_for_gm(cost: float, gm_pct: float) -> float:
+    return cost / (1 - gm_pct / 100)
+
+
+def test_quote_gm_summary_as_of_reflects_only_what_existed_then(session):
+    """Part 14.15 Business Time Travel: a later revision must never leak into an earlier
+    as-of view, same principle as Sprint 0.5's revision_as_of tests, now applied to a Business
+    Mode aggregate rather than a single revision lookup."""
+    site = _make_site(session)
+    project = create_project(session, site.id, {})
+    quote = Quote(project_id=project.id)
+    session.add(quote)
+    session.flush()
+
+    jan, june = datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 6, 1, tzinfo=timezone.utc)
+    cost = 100_000
+
+    passing_price = selling_price_for_gm30(cost)
+    gm1 = gross_margin_percent(passing_price, cost)
+    status1, note1 = evaluate_gm30_gate(gm1)
+    session.add(
+        QuoteRevision(
+            quote_id=quote.id, revision_number=1, true_cost=cost, selling_price=passing_price,
+            gm_percent=gm1, gate_status=status1, gate_note=note1, created_at=jan,
+        )
+    )
+    session.flush()
+
+    blocked_price = _price_for_gm(cost, 10.0)
+    gm2 = gross_margin_percent(blocked_price, cost)
+    status2, note2 = evaluate_gm30_gate(gm2)
+    session.add(
+        QuoteRevision(
+            quote_id=quote.id, revision_number=2, true_cost=cost, selling_price=blocked_price,
+            gm_percent=gm2, gate_status=status2, gate_note=note2, created_at=june,
+        )
+    )
+    session.commit()
+
+    as_of_march = quote_gm_summary(session, as_of=datetime(2026, 3, 1, tzinfo=timezone.utc))
+    assert as_of_march["gate_status_counts"] == {"PASS": 1}
+
+    current = quote_gm_summary(session)
+    assert current["gate_status_counts"] == {"BLOCKED": 1}
+
+
+def test_revenue_summary_as_of_excludes_confirmations_that_had_not_happened_yet(session):
+    site = _make_site(session)
+    early_confirmation = _confirm_a_passing_quote(session, site)
+    early_confirmation.confirmed_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    site_b = _make_site(session)
+    late_confirmation = _confirm_a_passing_quote(session, site_b)
+    late_confirmation.confirmed_at = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    session.commit()
+
+    as_of_march = revenue_summary(session, as_of=datetime(2026, 3, 1, tzinfo=timezone.utc))
+    expected_one = selling_price_for_gm30(100_000)
+    assert round(as_of_march["total_confirmed_revenue"], 2) == round(expected_one, 2)
+
+    current = revenue_summary(session)
+    assert round(current["total_confirmed_revenue"], 2) == round(expected_one * 2, 2)

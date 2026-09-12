@@ -5,8 +5,9 @@ them write.
 """
 
 from collections import Counter
+from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.core.models.confirmation import Confirmation
 from app.core.models.party import SITE_TYPES, Site
@@ -16,6 +17,18 @@ from app.core.models.quote import Quote, QuoteRevision
 from app.core.models.supplier import SupplierQuote
 from app.domain.revisioning import latest_revision
 from app.domain.site_quality import is_healthy
+from app.domain.time_travel import revision_as_of
+
+
+def _active_as_of(model, as_of: datetime | None):
+    """A row is "active as of" a point in time when it hadn't been archived yet then -- either
+    never archived, or archived after `as_of`. Without the second clause, "View the business as
+    of 15 Mar 2026" would incorrectly exclude something that was still active back then but has
+    since been archived (Part 8's Time Travel principle applied to these Business Mode views).
+    """
+    if as_of is None:
+        return model.archived_at.is_(None)
+    return or_(model.archived_at.is_(None), model.archived_at > as_of)
 
 
 def pipeline_by_state(session) -> dict[str, int]:
@@ -30,19 +43,29 @@ def pipeline_by_state(session) -> dict[str, int]:
     return counts
 
 
-def quote_gm_summary(session) -> dict:
-    """Average GM% and gate-status breakdown across each quote's CURRENT revision only.
+def _current_quote_revisions(session, as_of: datetime | None) -> list[QuoteRevision]:
+    """Shared by every view below that needs "each quote's revision, as of a point in time" --
+    the latest one that existed by `as_of` (Part 8: never surface a revision created after the
+    date being viewed), or simply the current one when as_of is None.
+    """
+    quote_ids = session.execute(select(Quote.id).where(_active_as_of(Quote, as_of))).scalars().all()
+    if as_of is None:
+        revisions = (latest_revision(session, QuoteRevision, "quote_id", qid) for qid in quote_ids)
+    else:
+        revisions = (revision_as_of(session, QuoteRevision, "quote_id", qid, as_of) for qid in quote_ids)
+    return [rev for rev in revisions if rev is not None]
+
+
+def quote_gm_summary(session, as_of: datetime | None = None) -> dict:
+    """Average GM% and gate-status breakdown across each quote's CURRENT revision only (or, with
+    `as_of`, each quote's revision as it stood at that point in time -- Part 14.15's Business
+    Time Travel applied to this view).
 
     An old, superseded revision's GM must never be double-counted into a portfolio-wide average
     -- it's history (Law 4), not current state. Archived quotes are excluded the same way
-    pipeline_by_state excludes archived projects.
+    pipeline_by_state excludes archived projects, adjusted for `as_of` (see _active_as_of).
     """
-    quote_ids = session.execute(select(Quote.id).where(Quote.archived_at.is_(None))).scalars().all()
-    current_revisions = [
-        rev
-        for rev in (latest_revision(session, QuoteRevision, "quote_id", qid) for qid in quote_ids)
-        if rev is not None
-    ]
+    current_revisions = _current_quote_revisions(session, as_of)
 
     if not current_revisions:
         return {"quote_count": 0, "average_gm_percent": None, "gate_status_counts": {}}
@@ -56,20 +79,15 @@ def quote_gm_summary(session) -> dict:
     }
 
 
-def product_performance_summary(session) -> dict:
+def product_performance_summary(session, as_of: datetime | None = None) -> dict:
     """Part 26 Phase 1's "basic product performance": revenue and quote-line count per Product,
-    from each quote's CURRENT revision only -- same "current revision only" discipline as
-    quote_gm_summary, for the same reason (Law 4: a superseded revision is history, not current
-    state). Lines with no product_id (informational-only lines, or quotes predating this column)
-    are grouped under "unlinked" rather than silently dropped.
+    from each quote's CURRENT revision only (or, with `as_of`, as it stood at that point in
+    time) -- same "current revision only" discipline as quote_gm_summary, for the same reason.
+    Lines with no product_id (informational-only lines, or quotes predating this column) are
+    grouped under "unlinked" rather than silently dropped.
     """
     products_by_id = {p.id: p.code for p in session.execute(select(Product)).scalars()}
-    quote_ids = session.execute(select(Quote.id).where(Quote.archived_at.is_(None))).scalars().all()
-    current_revisions = [
-        rev
-        for rev in (latest_revision(session, QuoteRevision, "quote_id", qid) for qid in quote_ids)
-        if rev is not None
-    ]
+    current_revisions = _current_quote_revisions(session, as_of)
 
     revenue_by_product: dict[str, float] = {}
     line_count_by_product: dict[str, int] = {}
@@ -102,15 +120,23 @@ def healthy_sites_summary(session) -> dict:
     return {"total_sites": len(site_ids), "healthy_sites": healthy_count, "flagged_sites": len(site_ids) - healthy_count}
 
 
-def revenue_summary(session) -> dict:
+def revenue_summary(session, as_of: datetime | None = None) -> dict:
     """Part 14.1's "Revenue" plus Part 14.4's new-vs-repeat split, derived only from real
     Confirmation + Quote data -- no invented percentages. A customer's SECOND (or later)
     confirmed project counts as repeat business; their first is new acquisition.
 
+    `as_of` (Part 14.15 Business Time Travel): a Confirmation is itself a point-in-time decision
+    record, so "revenue as of a date" is simply every confirmation that had happened by then --
+    no need for revision_as_of here the way quote_gm_summary needs it, since
+    confirmed_quote_revision_number is already fixed at confirmation time and never changes.
+
     Recurring/maintenance and expansion (the other two Part 14.4 categories) aren't modeled yet
     -- there's no Maintenance/Repair entity to distinguish them from a first-time build.
     """
-    confirmations = session.execute(select(Confirmation).order_by(Confirmation.confirmed_at)).scalars().all()
+    query = select(Confirmation).order_by(Confirmation.confirmed_at)
+    if as_of is not None:
+        query = query.where(Confirmation.confirmed_at <= as_of)
+    confirmations = session.execute(query).scalars().all()
 
     seen_customer_ids: set = set()
     new_customer_revenue = 0.0
