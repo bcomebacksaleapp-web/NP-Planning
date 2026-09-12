@@ -1,10 +1,34 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, UniqueConstraint
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, utcnow
+
+# Project lifecycle states, Blueprint Part 23, in order. The order matters -- it's the source of
+# truth app.domain.project_lifecycle builds the linear transition graph from, so this list and
+# that graph can never silently drift apart.
+PROJECT_STATES = (
+    "DISCOVERED",
+    "QUALIFIED",
+    "SURVEY_REQUIRED",
+    "SURVEYED",
+    "CONFIGURED",
+    "ESTIMATED",
+    "BUDGETARY_QUOTE",
+    "FINAL_QUOTE",
+    "CONFIRMED",
+    "PROCUREMENT_READY",
+    "IN_PROGRESS",
+    "HANDOVER",
+    "KNOWLEDGE_HARVEST",
+    "LIFECYCLE",
+)
+# create_constraint=True (see identity.ActionLevel for why this needs to be explicit) -- belt
+# and suspenders alongside app.domain.state_machine's transition validation: this catches any
+# write that bypasses the domain layer, not just ones that go through it.
+ProjectState = Enum(*PROJECT_STATES, name="project_state", native_enum=False, create_constraint=True)
 
 
 class Project(Base):
@@ -12,7 +36,9 @@ class Project(Base):
 
     Project itself carries almost no business fields on purpose -- Phase 1 (Canopy) will add
     them via ProjectRevision.data, not by widening this table. Anything that can change over a
-    project's life belongs in a revision, not here.
+    project's life belongs in a revision, not here. `state` is the one exception: lifecycle state
+    is metadata about the Project row itself (Part 23), not revisioned content, the same way
+    `archived_at` is a plain mutable column despite Project being revisioned.
 
     Deliberately has no current_revision_id pointer column. A Project <-> ProjectRevision FK in
     both directions is a circular dependency that Alembic autogenerate gets the create-table
@@ -26,6 +52,7 @@ class Project(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     site_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sites.id"), nullable=False)
+    state: Mapped[str] = mapped_column(ProjectState, default=PROJECT_STATES[0], nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Archive, never hard-delete, per platform Law 5.
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
