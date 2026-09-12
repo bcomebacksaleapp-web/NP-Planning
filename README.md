@@ -23,19 +23,23 @@ tests/
 
 ## Local setup
 
+PostgreSQL 17 is installed locally (via winget, `postgresql-x64-17` Windows service) with a
+dedicated `np_planning` database owned by role `np_planning_app` (not the `postgres` superuser).
+Credentials live in `.env` (gitignored, not in this repo).
+
 ```bash
 python -m venv .venv
 ./.venv/Scripts/activate   # or source .venv/bin/activate on macOS/Linux
 pip install -r requirements.txt
-cp .env.example .env       # edit DATABASE_URL if you have Postgres running
+cp .env.example .env       # fill in DATABASE_URL -- ask whoever set up the local Postgres instance
 alembic upgrade head
 pytest
 ```
 
-Without a `DATABASE_URL` set, the app falls back to a local SQLite file — convenient for now, but
-**Postgres is the target dialect**. SQLite tolerates schema changes Postgres would reject, so
-switch to a real Postgres instance (local install or Docker) before Sprint 0.2 adds tables,
-to avoid migrations that pass locally but fail against Postgres.
+Without a `DATABASE_URL` set, the app falls back to a local SQLite file. `tests/test_migrations.py`
+deliberately still uses a throwaway SQLite file for its upgrade/downgrade round-trip (fast, no
+dependency on a running Postgres) — that's a smoke test for the migration *tool*, not a substitute
+for running real migrations against Postgres before trusting a schema change.
 
 ## Conventions
 
