@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.models.quote import Quote, QuoteLine, QuoteRevision
-from app.domain.constitution import evaluate_gm30_gate
+from app.domain.constitution import combine_gate_statuses, evaluate_gm30_gate
 from app.domain.events import record_event
 from app.domain.pricing import gross_margin_percent
 from app.domain.revisioning import next_revision_number
@@ -17,9 +17,20 @@ def _build_revision(
     selling_price: float,
     lines: list[dict],
     restored_from: int | None = None,
+    additional_gates: list[tuple[str, str]] | None = None,
 ) -> QuoteRevision:
+    """`additional_gates` lets a caller fold other Constitution gates (e.g. C3's quantity-basis
+    check) into this quote's overall gate_status via combine_gate_statuses -- so a placeholder-
+    quantity quote can never show as a clean PASS just because its GM% alone would pass C2
+    (Part 5: a high score on one gate must not compensate for a hard block/override on another).
+    """
     gm_percent = gross_margin_percent(selling_price, true_cost)
-    gate_status, gate_note = evaluate_gm30_gate(gm_percent)
+    gm_status, gm_note = evaluate_gm30_gate(gm_percent)
+
+    other_gates = additional_gates or []
+    gate_status = combine_gate_statuses([gm_status] + [status for status, _ in other_gates])
+    gate_note = "; ".join(note for note in [gm_note] + [n for _, n in other_gates] if note)
+
     revision = QuoteRevision(
         quote_id=quote_id,
         revision_number=revision_number,
@@ -49,12 +60,13 @@ def create_quote(
     selling_price: float,
     lines: list[dict],
     actor_user_id: uuid.UUID | None = None,
+    additional_gates: list[tuple[str, str]] | None = None,
 ) -> Quote:
     quote = Quote(project_id=project_id)
     session.add(quote)
     session.flush()
 
-    revision = _build_revision(quote.id, 1, true_cost, selling_price, lines)
+    revision = _build_revision(quote.id, 1, true_cost, selling_price, lines, additional_gates=additional_gates)
     session.add(revision)
     session.flush()
     record_event(
@@ -75,9 +87,12 @@ def update_quote(
     selling_price: float,
     lines: list[dict],
     actor_user_id: uuid.UUID | None = None,
+    additional_gates: list[tuple[str, str]] | None = None,
 ) -> QuoteRevision:
     revision_number = next_revision_number(session, QuoteRevision, "quote_id", quote.id)
-    revision = _build_revision(quote.id, revision_number, true_cost, selling_price, lines)
+    revision = _build_revision(
+        quote.id, revision_number, true_cost, selling_price, lines, additional_gates=additional_gates
+    )
     session.add(revision)
     session.flush()
     record_event(

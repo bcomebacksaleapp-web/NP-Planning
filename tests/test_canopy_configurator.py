@@ -59,9 +59,26 @@ def test_quote_true_cost_derives_from_computed_quantity_times_given_unit_cost(se
     current = latest_revision(session, QuoteRevision, "quote_id", quote.id)
     expected_area_with_waste = 24.0 * 1.05
     assert round(current.true_cost, 2) == round(expected_area_with_waste * 1500.0, 2)
-    assert current.gate_status in ("PASS", "OVERRIDE_REQUIRED", "BLOCKED")
     assert len(current.lines) == 1
     assert round(current.lines[0].quantity, 2) == round(expected_area_with_waste, 2)
+
+
+def test_quote_gate_never_shows_pass_while_the_quantity_is_a_placeholder(session):
+    """C3, enforced: a placeholder-quantity quote must not look production-ready just because
+    its GM% alone would clear C2's 30% pass floor -- combine_gate_statuses (Part 5) means the
+    quantity-basis gate's OVERRIDE_REQUIRED can never be hidden by a passing GM%."""
+    site = _make_site(session)
+    # A generous unit cost pushes GM comfortably above 30% -- if C3 weren't wired in, this would
+    # show as a clean PASS.
+    _, quote = configure_canopy_and_create_quote(
+        session, site.id, width_m=6.0, length_m=4.0, roof_cover="Metal Sheet", unit_cost_per_m2=1500.0
+    )
+    session.commit()
+
+    current = latest_revision(session, QuoteRevision, "quote_id", quote.id)
+    assert current.gate_status != "PASS"
+    assert current.gate_status == "OVERRIDE_REQUIRED"
+    assert "quantity basis" in current.gate_note.lower()
 
 
 def test_structural_sizing_never_appears_as_a_number_anywhere_in_the_pipeline(session):

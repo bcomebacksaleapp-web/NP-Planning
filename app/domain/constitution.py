@@ -90,6 +90,26 @@ def evaluate_capacity_gate(utilization_pct: float) -> tuple[str, str]:
     return CAPACITY_UNDERUTILIZED, f"underutilized: utilization {utilization_pct:.2f}% (below 60%)"
 
 
+QUANTITY_BASIS_VERIFIED = "VERIFIED"
+
+
+def evaluate_quantity_basis_gate(formula_status: str) -> tuple[str, str]:
+    """C3: "Fresh Price with uncertain quantity is not Fresh Cost. Critical quantities require a
+    defensible basis." A quote built on a quantity formula that isn't marked VERIFIED -- e.g.
+    app.domain.canopy_recipe's UNVERIFIED_PLACEHOLDER -- has no defensible basis yet, so this
+    always returns OVERRIDE_REQUIRED for it. That's the honesty this gate exists to enforce: a
+    placeholder-quantity quote must never look production-ready just because its GM% happens to
+    pass C2 (Part 5: a high score on one gate cannot compensate for a hard block/override on
+    another -- see combine_gate_statuses).
+    """
+    if formula_status == QUANTITY_BASIS_VERIFIED:
+        return GATE_PASS, ""
+    return (
+        GATE_OVERRIDE_REQUIRED,
+        f"override required: quantity basis is {formula_status}, not a defensible/verified basis (C3)",
+    )
+
+
 def combine_gate_statuses(statuses: list[str]) -> str:
     """Part 5: "a high score cannot compensate for a hard block." The actual enforcement of that
     rule -- any BLOCKED anywhere makes the combined result BLOCKED regardless of how many other

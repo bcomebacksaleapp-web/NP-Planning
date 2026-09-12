@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.models.project import Project
 from app.core.models.quote import Quote
 from app.domain.canopy_recipe import compute_canopy_quantities
+from app.domain.constitution import evaluate_quantity_basis_gate
 from app.domain.pricing import selling_price_for_gm30
 from app.domain.projects import create_project
 from app.domain.quotes import create_quote
@@ -47,6 +48,10 @@ def configure_canopy_and_create_quote(
 
     true_cost = quantities["roof_area_m2_with_waste"] * unit_cost_per_m2
     selling_price = selling_price_for_gm30(true_cost)
+    # C3: this quote's quantity comes from an UNVERIFIED_PLACEHOLDER formula (see
+    # canopy_recipe.py) -- folding that into the quote's gate via combine_gate_statuses means it
+    # can never show as a clean PASS just because the GM% alone happens to clear 30%.
+    quantity_gate = evaluate_quantity_basis_gate(quantities["formula_status"])
     quote = create_quote(
         session,
         project.id,
@@ -60,5 +65,6 @@ def configure_canopy_and_create_quote(
             }
         ],
         actor_user_id=actor_user_id,
+        additional_gates=[quantity_gate],
     )
     return project, quote

@@ -8,9 +8,11 @@ from app.domain.constitution import (
     GATE_OVERRIDE_REQUIRED,
     GATE_PASS,
     GATE_WARNING,
+    QUANTITY_BASIS_VERIFIED,
     combine_gate_statuses,
     evaluate_capacity_gate,
     evaluate_price_lock_gate,
+    evaluate_quantity_basis_gate,
     evaluate_stale_cost_gate,
 )
 
@@ -41,6 +43,16 @@ def test_capacity_gate_boundaries():
     assert evaluate_capacity_gate(95.0)[0] == CAPACITY_OVERRIDE_REQUIRED
     assert evaluate_capacity_gate(105.0)[0] == CAPACITY_OVERRIDE_REQUIRED
     assert evaluate_capacity_gate(105.01)[0] == CAPACITY_BLOCKED
+
+
+def test_quantity_basis_gate_passes_only_when_verified():
+    assert evaluate_quantity_basis_gate(QUANTITY_BASIS_VERIFIED)[0] == GATE_PASS
+
+
+def test_quantity_basis_gate_requires_override_for_any_unverified_status():
+    status, note = evaluate_quantity_basis_gate("UNVERIFIED_PLACEHOLDER")
+    assert status == GATE_OVERRIDE_REQUIRED
+    assert "UNVERIFIED_PLACEHOLDER" in note
 
 
 def test_combine_gate_statuses_a_block_always_wins():
