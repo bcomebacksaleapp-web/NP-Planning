@@ -154,15 +154,36 @@ theater" — that reason no longer applies:
 - `app.domain.auth` — bcrypt password hashing (never the plain password persisted), opaque
   server-verified session tokens (only a SHA-256 hash of the token is stored; revocation is a row
   update, not a JWT blocklist).
-- `GET /business/health` is the first permission-gated endpoint, wrapping the real Business Mode
-  aggregations behind `require_permission("business_health", "READ")` — a role with no grant is
-  denied by default.
 - Found and fixed a real bug building this: SQLite doesn't preserve timezone-awareness on a
   `DateTime(timezone=True)` column the way Postgres does, so comparing a freshly-read
   `expires_at` against `utcnow()` raised `TypeError` (aware vs. naive). Locked in by a test that
   constructs an already-expired session directly.
 - API tests run against the same isolated in-memory SQLite session as everything else — `get_db`
   is overridden in tests, never hitting the real dev Postgres database.
+
+**The API surface** — every route wraps already-tested domain logic behind
+`require_permission(resource, action_level)`; nothing new was invented to build this layer, it's
+the same mechanical pattern repeated. Law 14's READ/SUGGEST/DRAFT/COMMIT distinction is enforced
+structurally: `POST /canopy/configure` is DRAFT, `POST /quotes/confirm` is COMMIT, and a role
+holding only the former gets a real `403` attempting the latter (proven directly in
+`test_confirm_quote_requires_commit_permission_not_draft`).
+
+| Route | Wraps |
+|---|---|
+| `POST /auth/login`, `POST /auth/logout` | `app.domain.auth` |
+| `GET /business/health` (+ `as_of`) | all six `business_health.py` views |
+| `POST /canopy/configure` | `canopy_configurator.configure_canopy_and_create_quote` |
+| `POST /quotes/confirm` | `confirmations.confirm_project` |
+| `POST /quotes/{id}/what-if` | `what_if.py` |
+| `GET /quotes/{id}/recommendations` | `next_best_action.recommend_for_quote` |
+| `POST /opportunities`, `.../convert` | `opportunities.py` |
+| `POST /critical-specs/{id}/transition` | `critical_specs.py` |
+| `POST /sites/{id}/quality-flags`, `GET .../quality`, `POST /quality-flags/{id}/resolve` | `site_quality.py` |
+| `GET /sites/{id}/knowledge`, `.../survey-checklist` | `site_knowledge.py`, `unknown_radar.py` |
+
+**Not yet exposed via API** (still domain-layer-only, same as everything above was before this
+round): Website Studio (branch/page/widget CRUD), Supplier actual-procurement recording, Product
+Recipe versioning.
 
 ## Layout
 
@@ -176,11 +197,12 @@ app/
             pricing, constitution, quotes, fresh_price, suppliers, site_knowledge,
             business_health, opportunities, critical_specs, canopy_recipe, canopy_configurator,
             confirmations, what_if, unknown_radar, next_best_action, site_quality, website, auth
-  api/      presentation layer -- deps.py (get_current_user/require_permission),
-            routers/auth.py (login/logout), routers/business.py (GET /business/health)
-  main.py   FastAPI app: /health, /auth/login, /auth/logout, /business/health
+  api/      presentation layer -- deps.py (get_current_user/require_permission), routers/
+            (auth, business, canopy, quotes, opportunities, critical_specs, site_quality,
+            site_knowledge) -- 20 routes total, see the table above
+  main.py   FastAPI app wiring all routers together
 migrations/ Alembic migration scripts (20, baseline through real authentication)
-tests/      163 tests across all of the above, all passing against both SQLite (CI) and real
+tests/      184 tests across all of the above, all passing against both SQLite (CI) and real
             Postgres (verified manually before every commit -- see git log)
 ```
 
