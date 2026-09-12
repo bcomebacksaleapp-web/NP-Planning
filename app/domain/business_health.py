@@ -13,6 +13,7 @@ from app.core.models.party import SITE_TYPES, Site
 from app.core.models.product import Product
 from app.core.models.project import PROJECT_STATES, Project
 from app.core.models.quote import Quote, QuoteRevision
+from app.core.models.supplier import SupplierQuote
 from app.domain.revisioning import latest_revision
 from app.domain.site_quality import is_healthy
 
@@ -136,3 +137,30 @@ def revenue_summary(session) -> dict:
         "new_customer_revenue": new_customer_revenue,
         "repeat_customer_revenue": repeat_customer_revenue,
     }
+
+
+def supplier_concentration_summary(session) -> dict:
+    """Part 14.9: supplier concentration / single-source risk, per material. The single
+    largest supplier's share of quotes for that material is exactly what "concentration risk"
+    means -- a high share means the business has few real alternatives if that one supplier
+    fails to deliver.
+
+    Reads whatever SupplierQuote rows exist (Part 13.7's schema, Phase 1) -- there is no real
+    supplier data entered yet, so in practice this returns an empty dict today, same as every
+    other Business Mode view before real data existed to aggregate.
+    """
+    quotes = session.execute(select(SupplierQuote)).scalars().all()
+    counts_by_material: dict[str, Counter] = {}
+    for quote in quotes:
+        counts_by_material.setdefault(quote.material_description, Counter())[quote.supplier_id] += 1
+
+    result = {}
+    for material, counts in counts_by_material.items():
+        total = sum(counts.values())
+        _, top_count = counts.most_common(1)[0]
+        result[material] = {
+            "quote_count": total,
+            "distinct_suppliers": len(counts),
+            "top_supplier_share_percent": top_count / total * 100,
+        }
+    return result

@@ -1,6 +1,9 @@
+from datetime import date
+
 from app.core.models.party import Customer, Site
 from app.core.models.product import Product
 from app.core.models.project import PROJECT_STATES
+from app.core.models.supplier import Supplier, SupplierQuote
 from app.domain.archiving import archive
 from app.domain.business_health import (
     healthy_sites_summary,
@@ -9,6 +12,7 @@ from app.domain.business_health import (
     quote_gm_summary,
     revenue_summary,
     site_capture_summary,
+    supplier_concentration_summary,
 )
 from app.domain.confirmations import confirm_project
 from app.domain.pricing import selling_price_for_gm30
@@ -222,3 +226,45 @@ def test_revenue_summary_counts_a_customers_second_confirmation_as_repeat(sessio
     assert round(summary["new_customer_revenue"], 2) == round(expected_each, 2)
     assert round(summary["repeat_customer_revenue"], 2) == round(expected_each, 2)
     assert round(summary["total_confirmed_revenue"], 2) == round(expected_each * 2, 2)
+
+
+def _make_quote(session, supplier_name, material, price):
+    from sqlalchemy import select
+
+    supplier = session.execute(select(Supplier).where(Supplier.name == supplier_name)).scalar_one_or_none()
+    if supplier is None:
+        supplier = Supplier(name=supplier_name)
+        session.add(supplier)
+        session.flush()
+    session.add(
+        SupplierQuote(
+            supplier_id=supplier.id, material_description=material, quoted_price=price,
+            quote_date=date(2026, 1, 1), validity_days=14, lock_days=30, lead_time_days=21,
+        )
+    )
+
+
+def test_supplier_concentration_summary_is_empty_with_no_supplier_data(session):
+    assert supplier_concentration_summary(session) == {}
+
+
+def test_supplier_concentration_summary_flags_a_single_source_material(session):
+    _make_quote(session, "Supplier A", "Metal Sheet", 98.0)
+    _make_quote(session, "Supplier A", "Metal Sheet", 99.0)
+    _make_quote(session, "Supplier B", "Metal Sheet", 105.0)
+    session.commit()
+
+    summary = supplier_concentration_summary(session)
+    assert summary["Metal Sheet"]["quote_count"] == 3
+    assert summary["Metal Sheet"]["distinct_suppliers"] == 2
+    assert round(summary["Metal Sheet"]["top_supplier_share_percent"], 2) == round(2 / 3 * 100, 2)
+
+
+def test_supplier_concentration_summary_tracks_materials_independently(session):
+    _make_quote(session, "Supplier A", "Metal Sheet", 98.0)
+    _make_quote(session, "Supplier B", "Polycarbonate", 50.0)
+    session.commit()
+
+    summary = supplier_concentration_summary(session)
+    assert set(summary.keys()) == {"Metal Sheet", "Polycarbonate"}
+    assert summary["Metal Sheet"]["top_supplier_share_percent"] == 100.0
