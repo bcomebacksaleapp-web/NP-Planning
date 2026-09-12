@@ -108,21 +108,40 @@ text directly:
   (estimating cost/risk exposure of an unknown), which runs into the same real-data wall as the
   Canopy takeoff formula.
 
+**Phase 3 (Business Mode) — underway.** C10 (Healthy Sites) was deferred earlier purely for phase
+sequencing (Part 26 assigns it here), not missing data — now in sequence, not ahead of it:
+
+- **Healthy Sites** (C10) — `SiteQualityFlag` with the exact flag types C10 lists (bad payment,
+  repeated scope abuse, margin leakage, high dispute, excessive admin burden, unsafe practices,
+  poor capacity fit). `is_healthy()` is deliberately binary — no formula for a graded score exists
+  in the Blueprint, so none is invented here.
+- **Revenue / Revenue Floor** (Part 14.1/14.4) — new-vs-repeat customer revenue split, derived
+  entirely from real `Confirmation`/`Quote`/`Site` relations already in the system. Recurring/
+  maintenance and expansion (the other two Part 14.4 categories) aren't modeled — no Maintenance/
+  Repair entity exists yet to distinguish them from a first-time build.
+- **Supplier concentration** (Part 14.9) — per-material quote count, distinct-supplier count, and
+  single-largest-supplier share, over Phase 1's existing `SupplierQuote` schema. Returns empty
+  until real supplier data exists, same as every Business Mode view before real data was there to
+  aggregate.
+- **5 Capital, Portfolio Mix beyond type/product, Margin Leakage** are not built — they need real
+  historical financials, customer-quality signals, or geographic data this repo doesn't have.
+
 ## Layout
 
 ```
 app/
   core/     settings, DB engine, ORM models (identity, party, project, event, feature_flag,
-            product, quote, supplier, survey, opportunity, critical_spec, confirmation)
+            product, quote, supplier, survey, opportunity, critical_spec, confirmation,
+            site_quality_flag)
   domain/   business engine -- revisioning, archiving, events, calculations, time_travel,
             authorization, feature_flags, state_machine, project_lifecycle, projects, recipes,
             pricing, constitution, quotes, fresh_price, suppliers, site_knowledge,
             business_health, opportunities, critical_specs, canopy_recipe, canopy_configurator,
-            confirmations, what_if, unknown_radar, next_best_action
+            confirmations, what_if, unknown_radar, next_best_action, site_quality
   api/      presentation layer (empty -- no real endpoints until real auth exists)
   main.py   FastAPI app (currently: GET /health only)
-migrations/ Alembic migration scripts (17, baseline through linking quote lines to product)
-tests/      128 tests across all of the above, all passing against both SQLite (CI) and real
+migrations/ Alembic migration scripts (18, baseline through site quality flags)
+tests/      139 tests across all of the above, all passing against both SQLite (CI) and real
             Postgres (verified manually before every commit -- see git log)
 ```
 
