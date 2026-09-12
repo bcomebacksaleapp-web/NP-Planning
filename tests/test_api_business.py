@@ -45,3 +45,17 @@ def test_business_health_returns_real_data_when_permitted(session, client):
     assert "pipeline_by_state" in body
     assert body["pipeline_by_state"]["DISCOVERED"] == 0  # real aggregation, just no data yet
     assert body["quote_gm_summary"]["quote_count"] == 0
+    # All six Business Mode views, not just the original three.
+    assert set(body.keys()) == {
+        "pipeline_by_state", "quote_gm_summary", "revenue_summary", "product_performance_summary",
+        "site_capture_summary", "healthy_sites_summary", "supplier_concentration_summary",
+    }
+
+
+def test_business_health_accepts_an_as_of_query_param(session, client):
+    token = _login(session, client, grant_permission=True)
+    response = client.get(
+        "/business/health", params={"as_of": "2026-01-01T00:00:00Z"}, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    assert response.json()["quote_gm_summary"]["quote_count"] == 0
