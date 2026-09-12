@@ -7,8 +7,11 @@ from app.api.routers import (
     critical_specs,
     opportunities,
     quotes,
+    recipes,
     site_knowledge,
     site_quality,
+    suppliers,
+    website,
 )
 
 app = FastAPI(title="NP Planning")
@@ -20,6 +23,9 @@ app.include_router(opportunities.router)
 app.include_router(critical_specs.router)
 app.include_router(site_quality.router)
 app.include_router(site_knowledge.router)
+app.include_router(website.router)
+app.include_router(suppliers.router)
+app.include_router(recipes.router)
 
 
 @app.get("/health")
