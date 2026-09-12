@@ -3,11 +3,24 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.models.product import ProductRecipe, RecipeVersion
+from app.core.models.product import Product, ProductRecipe, RecipeVersion
 from app.domain.events import record_event
 from app.domain.revisioning import next_revision_number
 
 _NUMBER_ATTR = "version_number"
+
+
+def get_or_create_product(session: Session, code: str, name: str) -> Product:
+    """Idempotent on `code` -- callers that just need "the Product row for CANOPY" (e.g. the
+    canopy configurator tagging its quote lines) shouldn't have to separately track whether
+    it's been created yet."""
+    product = session.execute(select(Product).where(Product.code == code)).scalar_one_or_none()
+    if product is not None:
+        return product
+    product = Product(code=code, name=name)
+    session.add(product)
+    session.flush()
+    return product
 
 
 def create_recipe(

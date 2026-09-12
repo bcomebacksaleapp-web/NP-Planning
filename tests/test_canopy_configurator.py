@@ -65,6 +65,23 @@ def test_quote_true_cost_derives_from_computed_quantity_times_given_unit_cost(se
     assert round(current.lines[0].quantity, 2) == round(expected_area_with_waste, 2)
 
 
+def test_quote_line_is_linked_to_the_canopy_product(session):
+    """Part 26 Phase 1's "basic product performance" needs Quote lines linked to a real Product
+    -- confirms that link actually gets made, not just that the schema column exists."""
+    from app.core.models.product import Product
+
+    site = _make_site(session)
+    _, quote = configure_canopy_and_create_quote(
+        session, site.id, width_m=6.0, length_m=4.0, roof_cover="Metal Sheet", unit_cost_per_m2=1500.0
+    )
+    session.commit()
+
+    current = latest_revision(session, QuoteRevision, "quote_id", quote.id)
+    linked_product = session.get(Product, current.lines[0].product_id)
+    assert linked_product is not None
+    assert linked_product.code == "CANOPY"
+
+
 def test_quote_gate_never_shows_pass_while_the_quantity_is_a_placeholder(session):
     """C3, enforced: a placeholder-quantity quote must not look production-ready just because
     its GM% alone would clear C2's 30% pass floor -- combine_gate_statuses (Part 5) means the

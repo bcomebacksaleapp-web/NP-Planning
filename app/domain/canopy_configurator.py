@@ -10,6 +10,9 @@ from app.domain.fresh_price import PriceQuote, select_procurement_quote
 from app.domain.pricing import selling_price_for_gm30
 from app.domain.projects import create_project
 from app.domain.quotes import create_quote
+from app.domain.recipes import get_or_create_product
+
+CANOPY_PRODUCT_CODE = "CANOPY"
 
 
 def configure_canopy_and_create_quote(
@@ -51,6 +54,7 @@ def configure_canopy_and_create_quote(
         unit_cost_per_m2 = selected.price
 
     quantities = compute_canopy_quantities(width_m, length_m)
+    product = get_or_create_product(session, CANOPY_PRODUCT_CODE, "Canopy")
 
     project = create_project(
         session,
@@ -82,6 +86,7 @@ def configure_canopy_and_create_quote(
                 "description": f"Canopy roof ({roof_cover}), {width_m}m x {length_m}m",
                 "quantity": quantities["roof_area_m2_with_waste"],
                 "unit_price": unit_cost_per_m2,
+                "product_id": product.id,
             }
         ],
         actor_user_id=actor_user_id,

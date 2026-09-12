@@ -58,12 +58,19 @@ class QuoteRevision(Base):
 
 class QuoteLine(Base):
     """Informational line-item detail for exactly one QuoteRevision -- never shared or mutated
-    across revisions, same append-only discipline as the revision itself."""
+    across revisions, same append-only discipline as the revision itself.
+
+    `product_id` is nullable and optional -- a line isn't required to tie back to a catalog
+    Product (Part 21). When it does, Business Mode's basic product-performance view
+    (app.domain.business_health.product_performance_summary) can use it; when it doesn't, the
+    line is just informational detail, same as before this column existed.
+    """
 
     __tablename__ = "quote_lines"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     quote_revision_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("quote_revisions.id"), nullable=False)
+    product_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("products.id"), nullable=True)
     description: Mapped[str] = mapped_column(String(256), nullable=False)
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     unit_price: Mapped[float] = mapped_column(Float, nullable=False)

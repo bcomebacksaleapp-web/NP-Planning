@@ -47,6 +47,7 @@ def _build_revision(
             quantity=line["quantity"],
             unit_price=line["unit_price"],
             line_total=line["quantity"] * line["unit_price"],
+            product_id=line.get("product_id"),
         )
         for line in lines
     ]
@@ -121,7 +122,12 @@ def restore_quote_revision(
     ).scalar_one()
 
     lines = [
-        {"description": line.description, "quantity": line.quantity, "unit_price": line.unit_price}
+        {
+            "description": line.description,
+            "quantity": line.quantity,
+            "unit_price": line.unit_price,
+            "product_id": line.product_id,
+        }
         for line in target.lines
     ]
     new_revision_number = next_revision_number(session, QuoteRevision, "quote_id", quote.id)

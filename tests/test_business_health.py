@@ -1,7 +1,13 @@
 from app.core.models.party import Customer, Site
+from app.core.models.product import Product
 from app.core.models.project import PROJECT_STATES
 from app.domain.archiving import archive
-from app.domain.business_health import pipeline_by_state, quote_gm_summary, site_capture_summary
+from app.domain.business_health import (
+    pipeline_by_state,
+    product_performance_summary,
+    quote_gm_summary,
+    site_capture_summary,
+)
 from app.domain.pricing import selling_price_for_gm30
 from app.domain.project_lifecycle import transition_project
 from app.domain.projects import create_project
@@ -105,3 +111,57 @@ def test_site_capture_summary_counts_by_type_and_excludes_archived(session):
     assert summary["by_type"]["FACTORY"] == 1
     assert summary["by_type"]["HOME"] == 1
     assert summary["by_type"]["OFFICE"] == 0
+
+
+def test_product_performance_summary_groups_by_product_code(session):
+    site = _make_site(session)
+    project = create_project(session, site.id, {})
+    product = Product(code="CANOPY", name="Canopy")
+    session.add(product)
+    session.flush()
+
+    create_quote(
+        session, project.id, 100_000, selling_price_for_gm30(100_000),
+        [{"description": "roof", "quantity": 1, "unit_price": selling_price_for_gm30(100_000), "product_id": product.id}],
+    )
+    session.commit()
+
+    summary = product_performance_summary(session)
+    assert summary["line_count_by_product"]["CANOPY"] == 1
+    assert round(summary["revenue_by_product"]["CANOPY"], 2) == round(selling_price_for_gm30(100_000), 2)
+
+
+def test_product_performance_summary_groups_unlinked_lines_separately(session):
+    site = _make_site(session)
+    project = create_project(session, site.id, {})
+    create_quote(
+        session, project.id, 100_000, selling_price_for_gm30(100_000),
+        [{"description": "misc", "quantity": 1, "unit_price": selling_price_for_gm30(100_000)}],  # no product_id
+    )
+    session.commit()
+
+    summary = product_performance_summary(session)
+    assert summary["line_count_by_product"]["unlinked"] == 1
+
+
+def test_product_performance_summary_uses_current_revision_only(session):
+    site = _make_site(session)
+    project = create_project(session, site.id, {})
+    product = Product(code="CANOPY", name="Canopy")
+    session.add(product)
+    session.flush()
+
+    quote = create_quote(
+        session, project.id, 100_000, selling_price_for_gm30(100_000),
+        [{"description": "v1", "quantity": 1, "unit_price": selling_price_for_gm30(100_000), "product_id": product.id}],
+    )
+    update_quote(
+        session, quote, 100_000, selling_price_for_gm30(100_000),
+        [{"description": "v2", "quantity": 1, "unit_price": 999.0, "product_id": product.id}],
+    )
+    session.commit()
+
+    summary = product_performance_summary(session)
+    # Only the v2 line's revenue should count -- v1 is a superseded revision (Law 4).
+    assert summary["line_count_by_product"]["CANOPY"] == 1
+    assert summary["revenue_by_product"]["CANOPY"] == 999.0

@@ -9,6 +9,7 @@ from collections import Counter
 from sqlalchemy import select
 
 from app.core.models.party import SITE_TYPES, Site
+from app.core.models.product import Product
 from app.core.models.project import PROJECT_STATES, Project
 from app.core.models.quote import Quote, QuoteRevision
 from app.domain.revisioning import latest_revision
@@ -50,6 +51,32 @@ def quote_gm_summary(session) -> dict:
         "average_gm_percent": average_gm,
         "gate_status_counts": dict(gate_counts),
     }
+
+
+def product_performance_summary(session) -> dict:
+    """Part 26 Phase 1's "basic product performance": revenue and quote-line count per Product,
+    from each quote's CURRENT revision only -- same "current revision only" discipline as
+    quote_gm_summary, for the same reason (Law 4: a superseded revision is history, not current
+    state). Lines with no product_id (informational-only lines, or quotes predating this column)
+    are grouped under "unlinked" rather than silently dropped.
+    """
+    products_by_id = {p.id: p.code for p in session.execute(select(Product)).scalars()}
+    quote_ids = session.execute(select(Quote.id).where(Quote.archived_at.is_(None))).scalars().all()
+    current_revisions = [
+        rev
+        for rev in (latest_revision(session, QuoteRevision, "quote_id", qid) for qid in quote_ids)
+        if rev is not None
+    ]
+
+    revenue_by_product: dict[str, float] = {}
+    line_count_by_product: dict[str, int] = {}
+    for revision in current_revisions:
+        for line in revision.lines:
+            key = products_by_id.get(line.product_id, "unlinked") if line.product_id else "unlinked"
+            revenue_by_product[key] = revenue_by_product.get(key, 0.0) + line.line_total
+            line_count_by_product[key] = line_count_by_product.get(key, 0) + 1
+
+    return {"revenue_by_product": revenue_by_product, "line_count_by_product": line_count_by_product}
 
 
 def site_capture_summary(session) -> dict:
