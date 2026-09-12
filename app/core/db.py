@@ -13,6 +13,16 @@ class Base(DeclarativeBase):
     """Shared declarative base for all ORM entities."""
 
 
+def get_db():
+    """FastAPI dependency: one Session per request, always closed afterward regardless of
+    whether the request raised."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
 def utcnow() -> datetime:
     """Client-side timestamp default, deliberately not a DB server_default.
 

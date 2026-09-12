@@ -15,3 +15,4 @@ from app.core.models.critical_spec import CriticalSpec  # noqa: F401
 from app.core.models.confirmation import Confirmation  # noqa: F401
 from app.core.models.site_quality_flag import SiteQualityFlag  # noqa: F401
 from app.core.models.website import WebsiteBranch, WebsitePage, WebsitePageRevision, WidgetInstance  # noqa: F401
+from app.core.models.session_token import SessionToken  # noqa: F401

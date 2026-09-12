@@ -1,2 +1,2 @@
-# Presentation layer (Customer / Agent / Business surfaces). Empty in Sprint 0.1 -- see app/main.py
-# for the one route (health check) that exists so far.
+# Presentation layer (Customer / Agent / Business surfaces). Real endpoints started once real
+# auth existed to protect them -- see app/api/deps.py and app/api/routers/.
