@@ -49,37 +49,53 @@ built and tested against that source text directly:
   MOQ. Feeds real rows into the Fresh Price functions above.
 - **Survey/SurveyObservation** (Part 16, "evidence has boundaries") — every field the Blueprint
   names explicitly; never collapses conflicting observations into one "answer".
-- **Constitution gates C1/C6/C9** — stale cost, price lock coverage, capacity, each verbatim from
-  the Blueprint's band definitions, plus `combine_gate_statuses()` — the actual enforcement of
+- **Constitution gates C1/C2/C5/C6/C7/C9** — stale cost, GM30, critical spec confirmation, price
+  lock coverage, project-closed-≠-site-closed, capacity — each verbatim from the Blueprint's band
+  definitions or state chains, plus `combine_gate_statuses()`: the actual enforcement of
   "a high score cannot compensate for a hard block" (Part 5), not just a comment saying so.
 - **Opportunity** — lead capture, converting into a real Project.
+- **Canopy configurator, end to end** — `configure_canopy_and_create_quote()` takes customer
+  dimensions and a roof-cover choice and produces real `Project`/`ProjectRevision`/`Quote`/
+  `QuoteRevision`/`QuoteLine` rows with a real GM30 gate decision, verified by re-fetching from
+  the database by id (not just checking a return value) — directly proving Phase 1's own
+  acceptance criterion: "Customer configuration must generate canonical business data, not
+  UI-only data." **The quantity formula itself is an explicitly-labeled placeholder** (see below)
+  — no real canopy BOQ methodology exists anywhere on this machine (confirmed by searching every
+  other project); built on your direction to prove the pipeline while being unmistakable that the
+  numbers aren't real.
 
-**Deliberately not built, because it needs real input this repo doesn't have:**
-- The Canopy takeoff formula itself (roof area / gutter / flashing math, waste factors, labor
-  productivity rates) — `RecipeVersion.formula` is ready to hold it once supplied.
-- Structural sizing (column/beam/rafter) — Part 22 requires an engineer's confirmation, not an
-  app-computed value; not modeled as calculated at all yet.
-- Real supplier pricing data.
-- C3/C4/C5/C7/C8/C10 and the full weighted Constitution Health composite (Part 5 Step 3) — most
-  of their inputs don't exist as real data yet.
+**Still deliberately not built:**
+- **Real canopy quantities.** `app/domain/canopy_recipe.py`'s formula is generic, illustrative
+  geometry (`roof_area_m2 = width × length`, a round 5% waste factor) tagged
+  `UNVERIFIED_PLACEHOLDER` *inside the stored data itself*, not just in a docstring — the warning
+  survives being read out of the database later. Replace before any real quote is issued.
+- **Structural sizing** (column/beam/rafter) — never computed, placeholder or not.
+  `structure_sizing_status` is always `"PENDING_ENGINEER_CONFIRMATION"`. Part 22 requires a
+  qualified engineer to determine this from geometry + load; Law 13 doesn't relax for a
+  "just testing" label.
+- **Real supplier pricing data.**
+- C3/C4 (tied to the still-placeholder quantity engine) and C8/C10 — not blocked on data, but on
+  phase sequencing: Part 26 assigns them to Phase 5 (Learning Loop) and Phase 3 (Business Mode)
+  respectively, not Phase 1. The full weighted Constitution Health composite (Part 5 Step 3) is
+  deferred for the same reason as C3/C4/C8/C10 — most of its ten inputs aren't real yet.
 - Any HTTP endpoint beyond `/health`, and real login/session auth — no real endpoint exists to
   protect yet, and a placeholder auth mechanism would be security theater.
-- The Customer Mode configurator UI — needs the takeoff formula and a real product/UX decision.
+- A real Customer Mode UI — this is all domain-layer logic, proven by tests, not a webpage.
 
 ## Layout
 
 ```
 app/
   core/     settings, DB engine, ORM models (identity, party, project, event, feature_flag,
-            product, quote, supplier, survey, opportunity)
+            product, quote, supplier, survey, opportunity, critical_spec)
   domain/   business engine -- revisioning, archiving, events, calculations, time_travel,
             authorization, feature_flags, state_machine, project_lifecycle, projects, recipes,
             pricing, constitution, quotes, fresh_price, suppliers, site_knowledge,
-            business_health, opportunities
+            business_health, opportunities, critical_specs, canopy_recipe, canopy_configurator
   api/      presentation layer (empty -- no real endpoints until real auth exists)
   main.py   FastAPI app (currently: GET /health only)
-migrations/ Alembic migration scripts (14, baseline through opportunity lead capture)
-tests/      82 tests across all of the above, all passing against both SQLite (CI) and real
+migrations/ Alembic migration scripts (15, baseline through critical spec confirmation)
+tests/      98 tests across all of the above, all passing against both SQLite (CI) and real
             Postgres (verified manually before every commit -- see git log)
 ```
 
