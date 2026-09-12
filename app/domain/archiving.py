@@ -13,19 +13,23 @@ not speculatively.
 """
 
 from app.core.db import utcnow
+from app.domain.events import record_event
 
 
-def archive(session, obj) -> None:
-    """Idempotent: archiving an already-archived row is a no-op, not a timestamp bump."""
+def archive(session, obj, actor_user_id=None) -> None:
+    """Idempotent: archiving an already-archived row is a no-op, not a timestamp bump (and
+    does not log a second event -- nothing happened)."""
     if obj.archived_at is not None:
         return
     obj.archived_at = utcnow()
     session.flush()
+    record_event(session, obj.__tablename__, obj.id, "archived", actor_user_id=actor_user_id)
 
 
-def unarchive(session, obj) -> None:
+def unarchive(session, obj, actor_user_id=None) -> None:
     obj.archived_at = None
     session.flush()
+    record_event(session, obj.__tablename__, obj.id, "unarchived", actor_user_id=actor_user_id)
 
 
 def is_archived(obj) -> bool:

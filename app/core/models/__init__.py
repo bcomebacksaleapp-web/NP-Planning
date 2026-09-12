@@ -4,3 +4,4 @@
 from app.core.models.identity import Permission, Role, RolePermission, User  # noqa: F401
 from app.core.models.party import Customer, Site  # noqa: F401
 from app.core.models.project import Project, ProjectRevision  # noqa: F401
+from app.core.models.event import Event  # noqa: F401
