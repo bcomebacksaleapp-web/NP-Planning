@@ -3,15 +3,19 @@ from app.core.models.product import Product
 from app.core.models.project import PROJECT_STATES
 from app.domain.archiving import archive
 from app.domain.business_health import (
+    healthy_sites_summary,
     pipeline_by_state,
     product_performance_summary,
     quote_gm_summary,
+    revenue_summary,
     site_capture_summary,
 )
+from app.domain.confirmations import confirm_project
 from app.domain.pricing import selling_price_for_gm30
 from app.domain.project_lifecycle import transition_project
 from app.domain.projects import create_project
 from app.domain.quotes import create_quote, update_quote
+from app.domain.site_quality import flag_site
 
 
 def _make_site(session, site_type="FACTORY") -> Site:
@@ -165,3 +169,56 @@ def test_product_performance_summary_uses_current_revision_only(session):
     # Only the v2 line's revenue should count -- v1 is a superseded revision (Law 4).
     assert summary["line_count_by_product"]["CANOPY"] == 1
     assert summary["revenue_by_product"]["CANOPY"] == 999.0
+
+
+def test_healthy_sites_summary_counts_flagged_vs_healthy(session):
+    healthy_site = _make_site(session)
+    flagged_site = _make_site(session)
+    flag_site(session, flagged_site.id, "BAD_PAYMENT", "Chronically late", flagged_by="PM K.")
+    session.commit()
+
+    summary = healthy_sites_summary(session)
+    assert summary["total_sites"] == 2
+    assert summary["healthy_sites"] == 1
+    assert summary["flagged_sites"] == 1
+
+
+def _confirm_a_passing_quote(session, site, project=None):
+    if project is None:
+        project = create_project(session, site.id, {})
+    cost = 100_000
+    quote = create_quote(
+        session, project.id, cost, selling_price_for_gm30(cost),
+        [{"description": "x", "quantity": 1, "unit_price": selling_price_for_gm30(cost)}],
+    )
+    return confirm_project(session, project, quote, confirmed_by="Estimator J.")
+
+
+def test_revenue_summary_counts_a_customers_first_confirmation_as_new(session):
+    site = _make_site(session)
+    _confirm_a_passing_quote(session, site)
+    session.commit()
+
+    summary = revenue_summary(session)
+    assert round(summary["new_customer_revenue"], 2) == round(selling_price_for_gm30(100_000), 2)
+    assert summary["repeat_customer_revenue"] == 0.0
+
+
+def test_revenue_summary_counts_a_customers_second_confirmation_as_repeat(session):
+    customer = Customer(name="Repeat Customer Co")
+    session.add(customer)
+    session.flush()
+    site_a = Site(customer_id=customer.id, site_type="FACTORY", name="Site A")
+    site_b = Site(customer_id=customer.id, site_type="FACTORY", name="Site B")
+    session.add_all([site_a, site_b])
+    session.flush()
+
+    _confirm_a_passing_quote(session, site_a)
+    _confirm_a_passing_quote(session, site_b)  # same customer, a different site -- still repeat
+    session.commit()
+
+    summary = revenue_summary(session)
+    expected_each = selling_price_for_gm30(100_000)
+    assert round(summary["new_customer_revenue"], 2) == round(expected_each, 2)
+    assert round(summary["repeat_customer_revenue"], 2) == round(expected_each, 2)
+    assert round(summary["total_confirmed_revenue"], 2) == round(expected_each * 2, 2)

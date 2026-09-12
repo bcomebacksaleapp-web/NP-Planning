@@ -8,11 +8,13 @@ from collections import Counter
 
 from sqlalchemy import select
 
+from app.core.models.confirmation import Confirmation
 from app.core.models.party import SITE_TYPES, Site
 from app.core.models.product import Product
 from app.core.models.project import PROJECT_STATES, Project
 from app.core.models.quote import Quote, QuoteRevision
 from app.domain.revisioning import latest_revision
+from app.domain.site_quality import is_healthy
 
 
 def pipeline_by_state(session) -> dict[str, int]:
@@ -87,3 +89,50 @@ def site_capture_summary(session) -> dict:
         by_type[site_type] += 1
         total += 1
     return {"total_sites": total, "by_type": by_type}
+
+
+def healthy_sites_summary(session) -> dict:
+    """Part 14.1's "Healthy Sites", using C10's binary flag-based definition (see
+    app.domain.site_quality.is_healthy) -- not a scored composite, since the Blueprint gives no
+    formula for one.
+    """
+    site_ids = session.execute(select(Site.id).where(Site.archived_at.is_(None))).scalars().all()
+    healthy_count = sum(1 for site_id in site_ids if is_healthy(session, site_id))
+    return {"total_sites": len(site_ids), "healthy_sites": healthy_count, "flagged_sites": len(site_ids) - healthy_count}
+
+
+def revenue_summary(session) -> dict:
+    """Part 14.1's "Revenue" plus Part 14.4's new-vs-repeat split, derived only from real
+    Confirmation + Quote data -- no invented percentages. A customer's SECOND (or later)
+    confirmed project counts as repeat business; their first is new acquisition.
+
+    Recurring/maintenance and expansion (the other two Part 14.4 categories) aren't modeled yet
+    -- there's no Maintenance/Repair entity to distinguish them from a first-time build.
+    """
+    confirmations = session.execute(select(Confirmation).order_by(Confirmation.confirmed_at)).scalars().all()
+
+    seen_customer_ids: set = set()
+    new_customer_revenue = 0.0
+    repeat_customer_revenue = 0.0
+
+    for confirmation in confirmations:
+        quote_revision = session.execute(
+            select(QuoteRevision).where(
+                QuoteRevision.quote_id == confirmation.quote_id,
+                QuoteRevision.revision_number == confirmation.confirmed_quote_revision_number,
+            )
+        ).scalar_one()
+        project = session.get(Project, confirmation.project_id)
+        site = session.get(Site, project.site_id)
+
+        if site.customer_id in seen_customer_ids:
+            repeat_customer_revenue += quote_revision.selling_price
+        else:
+            new_customer_revenue += quote_revision.selling_price
+            seen_customer_ids.add(site.customer_id)
+
+    return {
+        "total_confirmed_revenue": new_customer_revenue + repeat_customer_revenue,
+        "new_customer_revenue": new_customer_revenue,
+        "repeat_customer_revenue": repeat_customer_revenue,
+    }
