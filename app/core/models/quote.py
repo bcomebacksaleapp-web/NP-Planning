@@ -60,6 +60,13 @@ class QuoteLine(Base):
     """Informational line-item detail for exactly one QuoteRevision -- never shared or mutated
     across revisions, same append-only discipline as the revision itself.
 
+    `unit_price` is the SELLING price per unit (what the customer is charged), not the internal
+    cost -- product_performance_summary sums line_total as "revenue by product", so a caller
+    that puts raw cost here silently reports cost as revenue. (This bit the canopy configurator
+    itself once: it originally passed unit_cost_per_m2 straight through, making a 30%-margin
+    quote look like it earned 30% less revenue than it actually did. Fixed in
+    canopy_configurator.py by converting to the per-unit selling price before building the line.)
+
     `product_id` is nullable and optional -- a line isn't required to tie back to a catalog
     Product (Part 21). When it does, Business Mode's basic product-performance view
     (app.domain.business_health.product_performance_summary) can use it; when it doesn't, the

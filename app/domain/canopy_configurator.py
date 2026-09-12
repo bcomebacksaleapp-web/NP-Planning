@@ -72,6 +72,13 @@ def configure_canopy_and_create_quote(
 
     true_cost = quantities["roof_area_m2_with_waste"] * unit_cost_per_m2
     selling_price = selling_price_for_gm30(true_cost)
+    # selling_price_for_gm30 is a linear scaling (divide by 0.70), so applying it per unit and
+    # multiplying by quantity gives exactly the same total as applying it once to the aggregate
+    # true_cost above -- this is what actually gets charged per m2, not the raw cost. QuoteLine's
+    # unit_price must be the selling price, never cost (see QuoteLine's docstring for why: this
+    # line used to pass unit_cost_per_m2 straight through, which made product_performance_summary
+    # silently report cost as "revenue").
+    unit_selling_price_per_m2 = selling_price_for_gm30(unit_cost_per_m2)
     # C3: this quote's quantity comes from an UNVERIFIED_PLACEHOLDER formula (see
     # canopy_recipe.py) -- folding that into the quote's gate via combine_gate_statuses means it
     # can never show as a clean PASS just because the GM% alone happens to clear 30%.
@@ -85,7 +92,7 @@ def configure_canopy_and_create_quote(
             {
                 "description": f"Canopy roof ({roof_cover}), {width_m}m x {length_m}m",
                 "quantity": quantities["roof_area_m2_with_waste"],
-                "unit_price": unit_cost_per_m2,
+                "unit_price": unit_selling_price_per_m2,
                 "product_id": product.id,
             }
         ],

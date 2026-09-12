@@ -6,6 +6,10 @@ venv/
 env/
 *.egg-info/
 
+# Temporary manual-testing tools -- not part of the app, throwaway
+.venv-streamlit-test/
+_temp_streamlit_test.py
+
 # Env / secrets
 .env
 .env.*

@@ -121,7 +121,11 @@ def test_configurator_derives_unit_cost_from_supplier_quotes_via_fresh_price(ses
     assert revision.data["unit_cost_per_m2"] == 1600.0  # Supplier C -- only one meeting the lock requirement
 
     current = latest_revision(session, QuoteRevision, "quote_id", quote.id)
-    assert current.lines[0].unit_price == 1600.0
+    # The line's unit_price is the SELLING price (cost / 0.70), not the raw supplier cost --
+    # see QuoteLine's docstring for why this distinction matters.
+    from app.domain.pricing import selling_price_for_gm30
+
+    assert current.lines[0].unit_price == selling_price_for_gm30(1600.0)
 
 
 def test_configurator_rejects_both_or_neither_cost_source(session):
@@ -149,3 +153,22 @@ def test_structural_sizing_never_appears_as_a_number_anywhere_in_the_pipeline(se
 
     revision = latest_revision(session, ProjectRevision, "project_id", project.id)
     assert revision.data["quantities"]["structure_sizing_status"] == "PENDING_ENGINEER_CONFIRMATION"
+
+
+def test_product_performance_revenue_matches_the_quotes_actual_selling_price(session):
+    """Regression test for a real bug found via manual testing: the quote line's unit_price was
+    the raw cost, not the selling price, so product_performance_summary silently reported cost
+    as "revenue" -- a 30%-margin quote looked like it earned 30% less than it actually did.
+    """
+    from app.domain.business_health import product_performance_summary
+
+    site = _make_site(session)
+    _, quote = configure_canopy_and_create_quote(
+        session, site.id, width_m=6.0, length_m=4.0, roof_cover="Metal Sheet", unit_cost_per_m2=1500.0
+    )
+    session.commit()
+
+    current = latest_revision(session, QuoteRevision, "quote_id", quote.id)
+    summary = product_performance_summary(session)
+
+    assert round(summary["revenue_by_product"]["CANOPY"], 2) == round(current.selling_price, 2)
