@@ -147,22 +147,40 @@ architecture rather than business-data specifics:
 - Full drag-and-drop editing, publishing workflow, diff/merge, and real widget rendering are not
   built — this is the data model only.
 
+**Real authentication and the first protected API endpoints.** The reason auth stayed unbuilt
+through Phase 0–3 was "no real endpoint to protect yet, and a placeholder would be security
+theater" — that reason no longer applies:
+
+- `app.domain.auth` — bcrypt password hashing (never the plain password persisted), opaque
+  server-verified session tokens (only a SHA-256 hash of the token is stored; revocation is a row
+  update, not a JWT blocklist).
+- `GET /business/health` is the first permission-gated endpoint, wrapping the real Business Mode
+  aggregations behind `require_permission("business_health", "READ")` — a role with no grant is
+  denied by default.
+- Found and fixed a real bug building this: SQLite doesn't preserve timezone-awareness on a
+  `DateTime(timezone=True)` column the way Postgres does, so comparing a freshly-read
+  `expires_at` against `utcnow()` raised `TypeError` (aware vs. naive). Locked in by a test that
+  constructs an already-expired session directly.
+- API tests run against the same isolated in-memory SQLite session as everything else — `get_db`
+  is overridden in tests, never hitting the real dev Postgres database.
+
 ## Layout
 
 ```
 app/
-  core/     settings, DB engine, ORM models (identity, party, project, event, feature_flag,
-            product, quote, supplier, survey, opportunity, critical_spec, confirmation,
-            site_quality_flag, website)
+  core/     settings, DB engine (+ get_db FastAPI dependency), ORM models (identity, party,
+            project, event, feature_flag, product, quote, supplier, survey, opportunity,
+            critical_spec, confirmation, site_quality_flag, website, session_token)
   domain/   business engine -- revisioning, archiving, events, calculations, time_travel,
             authorization, feature_flags, state_machine, project_lifecycle, projects, recipes,
             pricing, constitution, quotes, fresh_price, suppliers, site_knowledge,
             business_health, opportunities, critical_specs, canopy_recipe, canopy_configurator,
-            confirmations, what_if, unknown_radar, next_best_action, site_quality, website
-  api/      presentation layer (empty -- no real endpoints until real auth exists)
-  main.py   FastAPI app (currently: GET /health only)
-migrations/ Alembic migration scripts (19, baseline through Website Studio kernel)
-tests/      147 tests across all of the above, all passing against both SQLite (CI) and real
+            confirmations, what_if, unknown_radar, next_best_action, site_quality, website, auth
+  api/      presentation layer -- deps.py (get_current_user/require_permission),
+            routers/auth.py (login/logout), routers/business.py (GET /business/health)
+  main.py   FastAPI app: /health, /auth/login, /auth/logout, /business/health
+migrations/ Alembic migration scripts (20, baseline through real authentication)
+tests/      163 tests across all of the above, all passing against both SQLite (CI) and real
             Postgres (verified manually before every commit -- see git log)
 ```
 
