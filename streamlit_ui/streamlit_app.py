@@ -222,6 +222,21 @@ def t(key: str, **fmt) -> str:
     return text.format(**fmt) if fmt else text
 
 
+def chained_text_input(label: str, source_value: str | None, key_prefix: str) -> str:
+    """A text_input prefilled from another tab's output (e.g. the Site ID a different tab
+    just created) that keeps tracking that source value across reruns.
+
+    A plain `st.text_input(label, value=source_value, key="fixed_key")` only uses `value` the
+    very first time that key is ever rendered -- once "fixed_key" has an entry in
+    st.session_state, every later rerun ignores `value` entirely and shows the old stored
+    text, so the field would silently stop updating after the first site/project/etc was
+    created. Folding source_value into the key itself makes Streamlit treat a changed source
+    as a brand-new widget, which re-seeds it with the new value. A manual edit still sticks
+    across reruns as long as source_value itself doesn't change in between.
+    """
+    return st.text_input(label, value=source_value or "", key=f"{key_prefix}__{source_value or 'empty'}")
+
+
 st.set_page_config(page_title="NP Planning -- manual test UI", layout="wide")
 
 with st.sidebar:
@@ -281,8 +296,8 @@ with st.sidebar:
                 st.error(f"{response.status_code}: {response.text}")
     st.divider()
     st.caption(t("default_site_caption"))
-    st.session_state.last_site_id = st.text_input(
-        t("default_site_id"), value=st.session_state.last_site_id or "", key="default_site_id_input"
+    st.session_state.last_site_id = chained_text_input(
+        t("default_site_id"), st.session_state.last_site_id, "default_site_id_input"
     )
 
 if not st.session_state.token:
@@ -320,7 +335,7 @@ with tab_sites:
 
 with tab_canopy:
     st.subheader("POST /canopy/configure")
-    site_id = st.text_input(t("site_id"), value=st.session_state.last_site_id or "", key="canopy_site_id")
+    site_id = chained_text_input(t("site_id"), st.session_state.last_site_id, "canopy_site_id")
     col1, col2 = st.columns(2)
     width_m = col1.number_input(t("width_m"), value=6.0, min_value=0.1, key="canopy_width_m")
     length_m = col2.number_input(t("length_m"), value=4.0, min_value=0.1, key="canopy_length_m")
@@ -344,8 +359,8 @@ with tab_canopy:
 with tab_confirm:
     st.subheader("POST /quotes/confirm")
     st.caption(t("confirm_caption"))
-    project_id = st.text_input(t("project_id"), value=st.session_state.last_project_id or "", key="confirm_project_id")
-    quote_id = st.text_input(t("quote_id"), value=st.session_state.last_quote_id or "", key="confirm_quote_id")
+    project_id = chained_text_input(t("project_id"), st.session_state.last_project_id, "confirm_project_id")
+    quote_id = chained_text_input(t("quote_id"), st.session_state.last_quote_id, "confirm_quote_id")
     confirmed_by = st.text_input(t("confirmed_by"), value="Test Admin", key="confirm_confirmed_by")
     override_reason = st.text_input(t("override_reason"), value="Manual test confirmation", key="confirm_override_reason")
 
@@ -382,7 +397,7 @@ with tab_business:
 
 with tab_opportunities:
     st.subheader("POST /opportunities")
-    opp_site_id = st.text_input(t("site_id"), value=st.session_state.last_site_id or "", key="opp_site_id")
+    opp_site_id = chained_text_input(t("site_id"), st.session_state.last_site_id, "opp_site_id")
     source = st.selectbox(t("source"), ["website_inquiry", "referral", "repeat_customer"], key="opp_source")
     description = st.text_input(t("description"), value="Manual test opportunity", key="opp_description")
     if st.button(t("create_opportunity"), key="opp_create_btn"):
@@ -392,7 +407,7 @@ with tab_opportunities:
 
     st.divider()
     st.caption(t("convert_caption"))
-    opportunity_id = st.text_input(t("opportunity_id"), value=st.session_state.last_opportunity_id or "", key="opp_opportunity_id")
+    opportunity_id = chained_text_input(t("opportunity_id"), st.session_state.last_opportunity_id, "opp_opportunity_id")
     project_data = st.text_area(t("project_data_json"), value='{"name": "Converted from opportunity"}', key="opp_project_data")
     if st.button(t("convert_to_project"), key="opp_convert_btn"):
         try:
@@ -406,7 +421,7 @@ with tab_opportunities:
 
 with tab_specs:
     st.subheader("POST /critical-specs")
-    spec_project_id = st.text_input(t("project_id"), value=st.session_state.last_project_id or "", key="spec_project_id")
+    spec_project_id = chained_text_input(t("project_id"), st.session_state.last_project_id, "spec_project_id")
     spec_type = st.text_input(t("spec_type"), value="roof_material_model", key="specs_spec_type")
     spec_description = st.text_input(t("description"), value="TBD", key="specs_description")
     if st.button(t("create_critical_spec"), key="specs_create_btn"):
@@ -416,7 +431,7 @@ with tab_specs:
 
     st.divider()
     st.caption(t("transition_caption"))
-    spec_id = st.text_input(t("critical_spec_id"), value=st.session_state.last_spec_id or "", key="specs_spec_id")
+    spec_id = chained_text_input(t("critical_spec_id"), st.session_state.last_spec_id, "specs_spec_id")
     to_state = st.selectbox(t("transition_to"), ["PROPOSED", "CONFIRMED"], key="specs_to_state")
     spec_confirmed_by = st.text_input(t("confirmed_by_optional"), value="Estimator J.", key="specs_confirmed_by")
     if st.button(t("transition_spec"), key="specs_transition_btn"):
@@ -424,7 +439,7 @@ with tab_specs:
 
 with tab_quality:
     st.subheader("POST /sites/{id}/quality-flags")
-    quality_site_id = st.text_input(t("site_id"), value=st.session_state.last_site_id or "", key="quality_site_id")
+    quality_site_id = chained_text_input(t("site_id"), st.session_state.last_site_id, "quality_site_id")
     flag_type = st.selectbox(
         t("flag_type"),
         ["BAD_PAYMENT", "REPEATED_SCOPE_ABUSE", "MARGIN_LEAKAGE", "HIGH_DISPUTE", "EXCESSIVE_ADMIN_BURDEN", "UNSAFE_PRACTICES", "POOR_CAPACITY_FIT"],
@@ -445,13 +460,13 @@ with tab_quality:
         call("GET", f"/sites/{quality_site_id}/quality")
 
     st.divider()
-    flag_id = st.text_input(t("flag_id_to_resolve"), value=st.session_state.last_flag_id or "", key="quality_flag_id")
+    flag_id = chained_text_input(t("flag_id_to_resolve"), st.session_state.last_flag_id, "quality_flag_id")
     if st.button(t("resolve_flag"), key="quality_resolve_btn"):
         call("POST", f"/quality-flags/{flag_id}/resolve")
 
 with tab_knowledge:
     st.subheader("GET /sites/{id}/knowledge")
-    knowledge_site_id = st.text_input(t("site_id"), value=st.session_state.last_site_id or "", key="knowledge_site_id")
+    knowledge_site_id = chained_text_input(t("site_id"), st.session_state.last_site_id, "knowledge_site_id")
     if st.button(t("fetch_observations"), key="knowledge_fetch_btn"):
         call("GET", f"/sites/{knowledge_site_id}/knowledge")
 
@@ -471,7 +486,7 @@ with tab_website:
 
     st.divider()
     st.caption(t("create_page_caption"))
-    branch_id = st.text_input(t("branch_id"), value=st.session_state.last_branch_id or "", key="website_branch_id")
+    branch_id = chained_text_input(t("branch_id"), st.session_state.last_branch_id, "website_branch_id")
     slug = st.text_input(t("slug"), value="home", key="website_slug")
     widget_type = st.text_input(t("widget_type"), value="Hero", key="website_widget_type")
     if st.button(t("create_page"), key="website_create_page_btn"):
@@ -484,7 +499,7 @@ with tab_website:
 
     st.divider()
     st.caption(t("update_page_caption"))
-    page_id = st.text_input(t("page_id"), value=st.session_state.last_page_id or "", key="website_page_id")
+    page_id = chained_text_input(t("page_id"), st.session_state.last_page_id, "website_page_id")
     new_widget_type = st.text_input(t("new_widget_type"), value="ServiceCards", key="website_new_widget_type")
     if st.button(t("update_page"), key="website_update_page_btn"):
         call("PUT", f"/website/pages/{page_id}", json={"widgets": [{"widget_type": new_widget_type, "order_index": 0}]})
@@ -505,7 +520,7 @@ with tab_products:
 with tab_recipes:
     st.subheader("POST /recipes")
     st.caption(t("recipes_caption"))
-    product_id = st.text_input(t("product_id"), value=st.session_state.last_product_id or "", key="recipes_product_id")
+    product_id = chained_text_input(t("product_id"), st.session_state.last_product_id, "recipes_product_id")
     recipe_name = st.text_input(t("recipe_name"), value="Standard", key="recipes_recipe_name")
     formula_text = st.text_area(t("formula_json"), value='{"waste_factor": 0.05}', key="recipes_formula_text")
     if st.button(t("create_recipe"), key="recipes_create_btn"):
@@ -519,7 +534,7 @@ with tab_recipes:
                 st.session_state.last_recipe_id = body["recipe_id"]
 
     st.divider()
-    recipe_id = st.text_input(t("recipe_id"), value=st.session_state.last_recipe_id or "", key="recipes_recipe_id")
+    recipe_id = chained_text_input(t("recipe_id"), st.session_state.last_recipe_id, "recipes_recipe_id")
     new_formula_text = st.text_area(t("new_formula_json"), value='{"waste_factor": 0.08}', key="recipes_new_formula_text")
     if st.button(t("update_recipe"), key="recipes_update_btn"):
         try:
@@ -544,7 +559,7 @@ with tab_suppliers:
 
     st.divider()
     st.caption(t("supplier_quote_caption"))
-    supplier_id = st.text_input(t("supplier_id"), value=st.session_state.last_supplier_id or "", key="suppliers_supplier_id")
+    supplier_id = chained_text_input(t("supplier_id"), st.session_state.last_supplier_id, "suppliers_supplier_id")
     material_description = st.text_input(t("material_description"), value="Metal Sheet Roofing, 0.35mm", key="suppliers_material_description")
     qcol1, qcol2, qcol3 = st.columns(3)
     quoted_price = qcol1.number_input(t("quoted_price"), value=98.0, key="suppliers_quoted_price")
@@ -567,7 +582,7 @@ with tab_suppliers:
 
     st.divider()
     st.caption(t("actual_procurement_caption"))
-    supplier_quote_id = st.text_input(t("supplier_quote_id"), value=st.session_state.last_supplier_quote_id or "", key="suppliers_supplier_quote_id")
+    supplier_quote_id = chained_text_input(t("supplier_quote_id"), st.session_state.last_supplier_quote_id, "suppliers_supplier_quote_id")
     actual_price = st.number_input(t("actual_price"), value=99.5, key="suppliers_actual_price")
     actual_lead_time = st.number_input(t("actual_lead_time"), value=25, step=1, key="suppliers_actual_lead_time")
     if st.button(t("record_actual_procurement"), key="suppliers_record_actual_btn"):
