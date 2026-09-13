@@ -6,6 +6,10 @@ Configure the backend URL via the NP_PLANNING_API_BASE environment variable or a
 Streamlit Community Cloud, it can only reach a backend that is itself publicly reachable; it
 cannot talk to a `localhost` FastAPI process running on someone's own machine. Point it at a
 real deployed API, or run both locally together for now.
+
+Optionally pre-fill the login form via `default_email` / `default_password` in Streamlit
+secrets (`.streamlit/secrets.toml` locally -- gitignored, never commit real credentials; the
+app's own Secrets panel on Streamlit Cloud) so testers don't retype them every run.
 """
 
 import json
@@ -74,8 +78,8 @@ with st.sidebar:
             st.session_state.token = None
             st.rerun()
     else:
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
+        email = st.text_input("Email", value=st.secrets.get("default_email", ""))
+        password = st.text_input("Password", type="password", value=st.secrets.get("default_password", ""))
         if st.button("Log in"):
             response = requests.post(f"{API_BASE}/auth/login", json={"email": email, "password": password})
             if response.status_code == 200:
