@@ -7,17 +7,16 @@ them write.
 from collections import Counter
 from datetime import datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select, tuple_
+from sqlalchemy.orm import aliased
 
 from app.core.models.confirmation import Confirmation
 from app.core.models.party import SITE_TYPES, Site
 from app.core.models.product import Product
 from app.core.models.project import PROJECT_STATES, Project
 from app.core.models.quote import Quote, QuoteRevision
+from app.core.models.site_quality_flag import SiteQualityFlag
 from app.core.models.supplier import SupplierQuote
-from app.domain.revisioning import latest_revision
-from app.domain.site_quality import is_healthy
-from app.domain.time_travel import revision_as_of
 
 
 def _active_as_of(model, as_of: datetime | None):
@@ -47,13 +46,23 @@ def _current_quote_revisions(session, as_of: datetime | None) -> list[QuoteRevis
     """Shared by every view below that needs "each quote's revision, as of a point in time" --
     the latest one that existed by `as_of` (Part 8: never surface a revision created after the
     date being viewed), or simply the current one when as_of is None.
+
+    One query via ROW_NUMBER(), not N+1 (one query per quote via
+    app.domain.revisioning.latest_revision/time_travel.revision_as_of, as this used to do).
+    Those two helpers stay as they are -- they're the right tool for "this one quote's revision"
+    -- this is specifically for "every quote's revision at once", which needs its own query
+    shape to avoid looping a per-quote lookup over however many quotes exist.
     """
-    quote_ids = session.execute(select(Quote.id).where(_active_as_of(Quote, as_of))).scalars().all()
-    if as_of is None:
-        revisions = (latest_revision(session, QuoteRevision, "quote_id", qid) for qid in quote_ids)
-    else:
-        revisions = (revision_as_of(session, QuoteRevision, "quote_id", qid, as_of) for qid in quote_ids)
-    return [rev for rev in revisions if rev is not None]
+    row_number = func.row_number().over(
+        partition_by=QuoteRevision.quote_id, order_by=QuoteRevision.revision_number.desc()
+    ).label("rn")
+    filters = [QuoteRevision.quote_id.in_(select(Quote.id).where(_active_as_of(Quote, as_of)))]
+    if as_of is not None:
+        filters.append(QuoteRevision.created_at <= as_of)
+
+    ranked = select(QuoteRevision, row_number).where(*filters).subquery()
+    revision = aliased(QuoteRevision, ranked)
+    return list(session.execute(select(revision).where(ranked.c.rn == 1)).scalars())
 
 
 def quote_gm_summary(session, as_of: datetime | None = None) -> dict:
@@ -114,10 +123,21 @@ def healthy_sites_summary(session) -> dict:
     """Part 14.1's "Healthy Sites", using C10's binary flag-based definition (see
     app.domain.site_quality.is_healthy) -- not a scored composite, since the Blueprint gives no
     formula for one.
+
+    One query for all sites' active flags, not N+1 (one is_healthy() call per site, as this
+    used to do) -- is_healthy() itself is unchanged and still the right tool for "is this one
+    site healthy", just not looped here anymore.
     """
-    site_ids = session.execute(select(Site.id).where(Site.archived_at.is_(None))).scalars().all()
-    healthy_count = sum(1 for site_id in site_ids if is_healthy(session, site_id))
-    return {"total_sites": len(site_ids), "healthy_sites": healthy_count, "flagged_sites": len(site_ids) - healthy_count}
+    total_sites = session.execute(select(func.count()).select_from(Site).where(Site.archived_at.is_(None))).scalar_one()
+    # Joined to Site and filtered by archived_at too -- a flag on an archived site must not
+    # count here, or flagged_sites could exceed total_sites (an archived site isn't in that
+    # count at all) and healthy_sites would go negative.
+    flagged_sites = session.execute(
+        select(func.count(func.distinct(SiteQualityFlag.site_id)))
+        .join(Site, Site.id == SiteQualityFlag.site_id)
+        .where(SiteQualityFlag.resolved_at.is_(None), Site.archived_at.is_(None))
+    ).scalar_one()
+    return {"total_sites": total_sites, "healthy_sites": total_sites - flagged_sites, "flagged_sites": flagged_sites}
 
 
 def revenue_summary(session, as_of: datetime | None = None) -> dict:
@@ -138,25 +158,40 @@ def revenue_summary(session, as_of: datetime | None = None) -> dict:
         query = query.where(Confirmation.confirmed_at <= as_of)
     confirmations = session.execute(query).scalars().all()
 
+    # Three batch queries total, not three PER confirmation (a real N+1 this used to have) --
+    # one for every needed QuoteRevision (via a composite-key IN), one for every needed
+    # Project, one for every needed Site.
     seen_customer_ids: set = set()
     new_customer_revenue = 0.0
     repeat_customer_revenue = 0.0
 
-    for confirmation in confirmations:
-        quote_revision = session.execute(
-            select(QuoteRevision).where(
-                QuoteRevision.quote_id == confirmation.quote_id,
-                QuoteRevision.revision_number == confirmation.confirmed_quote_revision_number,
-            )
-        ).scalar_one()
-        project = session.get(Project, confirmation.project_id)
-        site = session.get(Site, project.site_id)
+    if confirmations:
+        revision_keys = [(c.quote_id, c.confirmed_quote_revision_number) for c in confirmations]
+        revisions_by_key = {
+            (r.quote_id, r.revision_number): r
+            for r in session.execute(
+                select(QuoteRevision).where(
+                    tuple_(QuoteRevision.quote_id, QuoteRevision.revision_number).in_(revision_keys)
+                )
+            ).scalars()
+        }
 
-        if site.customer_id in seen_customer_ids:
-            repeat_customer_revenue += quote_revision.selling_price
-        else:
-            new_customer_revenue += quote_revision.selling_price
-            seen_customer_ids.add(site.customer_id)
+        project_ids = {c.project_id for c in confirmations}
+        projects_by_id = {p.id: p for p in session.execute(select(Project).where(Project.id.in_(project_ids))).scalars()}
+
+        site_ids = {p.site_id for p in projects_by_id.values()}
+        sites_by_id = {s.id: s for s in session.execute(select(Site).where(Site.id.in_(site_ids))).scalars()}
+
+        for confirmation in confirmations:
+            quote_revision = revisions_by_key[(confirmation.quote_id, confirmation.confirmed_quote_revision_number)]
+            project = projects_by_id[confirmation.project_id]
+            site = sites_by_id[project.site_id]
+
+            if site.customer_id in seen_customer_ids:
+                repeat_customer_revenue += quote_revision.selling_price
+            else:
+                new_customer_revenue += quote_revision.selling_price
+                seen_customer_ids.add(site.customer_id)
 
     return {
         "total_confirmed_revenue": new_customer_revenue + repeat_customer_revenue,
