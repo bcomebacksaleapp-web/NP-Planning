@@ -227,7 +227,7 @@ st.set_page_config(page_title="NP Planning -- manual test UI", layout="wide")
 with st.sidebar:
     lang_choice = st.radio(
         "Language / ภาษา", ["ไทย", "English"],
-        index=0 if st.session_state.lang == "th" else 1, horizontal=True,
+        index=0 if st.session_state.lang == "th" else 1, horizontal=True, key="lang_choice",
     )
     st.session_state.lang = "th" if lang_choice == "ไทย" else "en"
     st.divider()
@@ -263,14 +263,16 @@ with st.sidebar:
     st.header(t("login_header"))
     if st.session_state.token:
         st.success(t("logged_in"))
-        if st.button(t("log_out")):
+        if st.button(t("log_out"), key="log_out_btn"):
             requests.post(f"{API_BASE}/auth/logout", headers=auth_headers())
             st.session_state.token = None
             st.rerun()
     else:
-        email = st.text_input(t("email"), value=st.secrets.get("default_email", ""))
-        password = st.text_input(t("password"), type="password", value=st.secrets.get("default_password", ""))
-        if st.button(t("log_in")):
+        email = st.text_input(t("email"), value=st.secrets.get("default_email", ""), key="login_email")
+        password = st.text_input(
+            t("password"), type="password", value=st.secrets.get("default_password", ""), key="login_password"
+        )
+        if st.button(t("log_in"), key="log_in_btn"):
             response = requests.post(f"{API_BASE}/auth/login", json={"email": email, "password": password})
             if response.status_code == 200:
                 st.session_state.token = response.json()["token"]
@@ -301,11 +303,11 @@ if not st.session_state.token:
 with tab_sites:
     st.subheader("POST /sites")
     st.caption(t("sites_caption"))
-    customer_name = st.text_input(t("customer_name"), value="Test Customer")
-    site_type = st.selectbox(t("site_type"), ["HOME", "OFFICE", "FACTORY"])
-    site_name = st.text_input(t("site_name"), value="Test Site")
-    site_address = st.text_input(t("address_optional"), value="")
-    if st.button(t("create_site")):
+    customer_name = st.text_input(t("customer_name"), value="Test Customer", key="sites_customer_name")
+    site_type = st.selectbox(t("site_type"), ["HOME", "OFFICE", "FACTORY"], key="sites_site_type")
+    site_name = st.text_input(t("site_name"), value="Test Site", key="sites_site_name")
+    site_address = st.text_input(t("address_optional"), value="", key="sites_address")
+    if st.button(t("create_site"), key="sites_create_btn"):
         body = call(
             "POST", "/sites",
             json={
@@ -318,14 +320,16 @@ with tab_sites:
 
 with tab_canopy:
     st.subheader("POST /canopy/configure")
-    site_id = st.text_input(t("site_id"), value=st.session_state.last_site_id or "")
+    site_id = st.text_input(t("site_id"), value=st.session_state.last_site_id or "", key="canopy_site_id")
     col1, col2 = st.columns(2)
-    width_m = col1.number_input(t("width_m"), value=6.0, min_value=0.1)
-    length_m = col2.number_input(t("length_m"), value=4.0, min_value=0.1)
-    roof_cover = st.selectbox(t("roof_cover"), ["Metal Sheet", "Polycarbonate", "Vinyl", "D-Lite", "Shinkolite"])
-    unit_cost_per_m2 = st.number_input(t("unit_cost_manual"), value=1500.0, min_value=0.0)
+    width_m = col1.number_input(t("width_m"), value=6.0, min_value=0.1, key="canopy_width_m")
+    length_m = col2.number_input(t("length_m"), value=4.0, min_value=0.1, key="canopy_length_m")
+    roof_cover = st.selectbox(
+        t("roof_cover"), ["Metal Sheet", "Polycarbonate", "Vinyl", "D-Lite", "Shinkolite"], key="canopy_roof_cover"
+    )
+    unit_cost_per_m2 = st.number_input(t("unit_cost_manual"), value=1500.0, min_value=0.0, key="canopy_unit_cost")
 
-    if st.button(t("configure_canopy")):
+    if st.button(t("configure_canopy"), key="canopy_configure_btn"):
         body = call(
             "POST", "/canopy/configure",
             json={
@@ -340,12 +344,12 @@ with tab_canopy:
 with tab_confirm:
     st.subheader("POST /quotes/confirm")
     st.caption(t("confirm_caption"))
-    project_id = st.text_input(t("project_id"), value=st.session_state.last_project_id or "")
-    quote_id = st.text_input(t("quote_id"), value=st.session_state.last_quote_id or "")
-    confirmed_by = st.text_input(t("confirmed_by"), value="Test Admin")
-    override_reason = st.text_input(t("override_reason"), value="Manual test confirmation")
+    project_id = st.text_input(t("project_id"), value=st.session_state.last_project_id or "", key="confirm_project_id")
+    quote_id = st.text_input(t("quote_id"), value=st.session_state.last_quote_id or "", key="confirm_quote_id")
+    confirmed_by = st.text_input(t("confirmed_by"), value="Test Admin", key="confirm_confirmed_by")
+    override_reason = st.text_input(t("override_reason"), value="Manual test confirmation", key="confirm_override_reason")
 
-    if st.button(t("confirm_quote")):
+    if st.button(t("confirm_quote"), key="confirm_quote_btn"):
         call(
             "POST", "/quotes/confirm",
             json={
@@ -358,39 +362,39 @@ with tab_confirm:
         st.divider()
         st.caption(t("what_if_caption"))
         wcol1, wcol2 = st.columns(2)
-        cost_change = wcol1.number_input(t("cost_change_pct"), value=8.0)
-        if wcol1.button(t("simulate_cost_change")):
+        cost_change = wcol1.number_input(t("cost_change_pct"), value=8.0, key="confirm_cost_change")
+        if wcol1.button(t("simulate_cost_change"), key="confirm_simulate_cost_btn"):
             call("POST", f"/quotes/{quote_id}/what-if", json={"cost_change_percent": cost_change})
-        discount = wcol2.number_input(t("discount_pct"), value=5.0)
-        if wcol2.button(t("simulate_discount")):
+        discount = wcol2.number_input(t("discount_pct"), value=5.0, key="confirm_discount")
+        if wcol2.button(t("simulate_discount"), key="confirm_simulate_discount_btn"):
             call("POST", f"/quotes/{quote_id}/what-if", json={"discount_percent": discount})
 
         st.caption(t("recommendations_caption"))
-        if st.button(t("fetch_recommendations")):
+        if st.button(t("fetch_recommendations"), key="confirm_fetch_recommendations_btn"):
             call("GET", f"/quotes/{quote_id}/recommendations")
 
 with tab_business:
     st.subheader("GET /business/health")
-    as_of = st.text_input(t("as_of"), value="")
-    if st.button(t("refresh_dashboard")):
+    as_of = st.text_input(t("as_of"), value="", key="business_as_of")
+    if st.button(t("refresh_dashboard"), key="business_refresh_btn"):
         params = {"as_of": as_of} if as_of else None
         call("GET", "/business/health", params=params)
 
 with tab_opportunities:
     st.subheader("POST /opportunities")
     opp_site_id = st.text_input(t("site_id"), value=st.session_state.last_site_id or "", key="opp_site_id")
-    source = st.selectbox(t("source"), ["website_inquiry", "referral", "repeat_customer"])
-    description = st.text_input(t("description"), value="Manual test opportunity")
-    if st.button(t("create_opportunity")):
+    source = st.selectbox(t("source"), ["website_inquiry", "referral", "repeat_customer"], key="opp_source")
+    description = st.text_input(t("description"), value="Manual test opportunity", key="opp_description")
+    if st.button(t("create_opportunity"), key="opp_create_btn"):
         body = call("POST", "/opportunities", json={"site_id": opp_site_id, "source": source, "description": description})
         if body:
             st.session_state.last_opportunity_id = body["id"]
 
     st.divider()
     st.caption(t("convert_caption"))
-    opportunity_id = st.text_input(t("opportunity_id"), value=st.session_state.last_opportunity_id or "")
-    project_data = st.text_area(t("project_data_json"), value='{"name": "Converted from opportunity"}')
-    if st.button(t("convert_to_project")):
+    opportunity_id = st.text_input(t("opportunity_id"), value=st.session_state.last_opportunity_id or "", key="opp_opportunity_id")
+    project_data = st.text_area(t("project_data_json"), value='{"name": "Converted from opportunity"}', key="opp_project_data")
+    if st.button(t("convert_to_project"), key="opp_convert_btn"):
         try:
             parsed = json.loads(project_data)
         except json.JSONDecodeError as e:
@@ -403,19 +407,19 @@ with tab_opportunities:
 with tab_specs:
     st.subheader("POST /critical-specs")
     spec_project_id = st.text_input(t("project_id"), value=st.session_state.last_project_id or "", key="spec_project_id")
-    spec_type = st.text_input(t("spec_type"), value="roof_material_model")
-    spec_description = st.text_input(t("description"), value="TBD")
-    if st.button(t("create_critical_spec")):
+    spec_type = st.text_input(t("spec_type"), value="roof_material_model", key="specs_spec_type")
+    spec_description = st.text_input(t("description"), value="TBD", key="specs_description")
+    if st.button(t("create_critical_spec"), key="specs_create_btn"):
         body = call("POST", "/critical-specs", json={"project_id": spec_project_id, "spec_type": spec_type, "description": spec_description})
         if body:
             st.session_state.last_spec_id = body["id"]
 
     st.divider()
     st.caption(t("transition_caption"))
-    spec_id = st.text_input(t("critical_spec_id"), value=st.session_state.last_spec_id or "")
-    to_state = st.selectbox(t("transition_to"), ["PROPOSED", "CONFIRMED"])
-    spec_confirmed_by = st.text_input(t("confirmed_by_optional"), value="Estimator J.")
-    if st.button(t("transition_spec")):
+    spec_id = st.text_input(t("critical_spec_id"), value=st.session_state.last_spec_id or "", key="specs_spec_id")
+    to_state = st.selectbox(t("transition_to"), ["PROPOSED", "CONFIRMED"], key="specs_to_state")
+    spec_confirmed_by = st.text_input(t("confirmed_by_optional"), value="Estimator J.", key="specs_confirmed_by")
+    if st.button(t("transition_spec"), key="specs_transition_btn"):
         call("POST", f"/critical-specs/{spec_id}/transition", json={"to_state": to_state, "confirmed_by": spec_confirmed_by})
 
 with tab_quality:
@@ -424,10 +428,11 @@ with tab_quality:
     flag_type = st.selectbox(
         t("flag_type"),
         ["BAD_PAYMENT", "REPEATED_SCOPE_ABUSE", "MARGIN_LEAKAGE", "HIGH_DISPUTE", "EXCESSIVE_ADMIN_BURDEN", "UNSAFE_PRACTICES", "POOR_CAPACITY_FIT"],
+        key="quality_flag_type",
     )
-    flag_description = st.text_input(t("flag_description"), value="Manual test flag")
-    flagged_by = st.text_input(t("flagged_by"), value="PM K.")
-    if st.button(t("flag_site")):
+    flag_description = st.text_input(t("flag_description"), value="Manual test flag", key="quality_flag_description")
+    flagged_by = st.text_input(t("flagged_by"), value="PM K.", key="quality_flagged_by")
+    if st.button(t("flag_site"), key="quality_flag_btn"):
         body = call(
             "POST", f"/sites/{quality_site_id}/quality-flags",
             json={"flag_type": flag_type, "description": flag_description, "flagged_by": flagged_by},
@@ -436,40 +441,40 @@ with tab_quality:
             st.session_state.last_flag_id = body["id"]
 
     st.divider()
-    if st.button(t("check_site_health")):
+    if st.button(t("check_site_health"), key="quality_check_btn"):
         call("GET", f"/sites/{quality_site_id}/quality")
 
     st.divider()
-    flag_id = st.text_input(t("flag_id_to_resolve"), value=st.session_state.last_flag_id or "")
-    if st.button(t("resolve_flag")):
+    flag_id = st.text_input(t("flag_id_to_resolve"), value=st.session_state.last_flag_id or "", key="quality_flag_id")
+    if st.button(t("resolve_flag"), key="quality_resolve_btn"):
         call("POST", f"/quality-flags/{flag_id}/resolve")
 
 with tab_knowledge:
     st.subheader("GET /sites/{id}/knowledge")
     knowledge_site_id = st.text_input(t("site_id"), value=st.session_state.last_site_id or "", key="knowledge_site_id")
-    if st.button(t("fetch_observations")):
+    if st.button(t("fetch_observations"), key="knowledge_fetch_btn"):
         call("GET", f"/sites/{knowledge_site_id}/knowledge")
 
     st.divider()
     st.caption(t("survey_checklist_caption"))
-    knowledge_types = st.text_input(t("knowledge_types"), value="pile_depth,soil_bearing")
-    if st.button(t("fetch_survey_checklist")):
+    knowledge_types = st.text_input(t("knowledge_types"), value="pile_depth,soil_bearing", key="knowledge_types_input")
+    if st.button(t("fetch_survey_checklist"), key="knowledge_checklist_btn"):
         call("GET", f"/sites/{knowledge_site_id}/survey-checklist", params={"knowledge_types": knowledge_types})
 
 with tab_website:
     st.subheader("POST /website/branches")
-    branch_name = st.text_input(t("branch_name"), value="MAIN")
-    if st.button(t("create_branch")):
+    branch_name = st.text_input(t("branch_name"), value="MAIN", key="website_branch_name")
+    if st.button(t("create_branch"), key="website_create_branch_btn"):
         body = call("POST", "/website/branches", json={"name": branch_name})
         if body:
             st.session_state.last_branch_id = body["id"]
 
     st.divider()
     st.caption(t("create_page_caption"))
-    branch_id = st.text_input(t("branch_id"), value=st.session_state.last_branch_id or "")
-    slug = st.text_input(t("slug"), value="home")
-    widget_type = st.text_input(t("widget_type"), value="Hero")
-    if st.button(t("create_page")):
+    branch_id = st.text_input(t("branch_id"), value=st.session_state.last_branch_id or "", key="website_branch_id")
+    slug = st.text_input(t("slug"), value="home", key="website_slug")
+    widget_type = st.text_input(t("widget_type"), value="Hero", key="website_widget_type")
+    if st.button(t("create_page"), key="website_create_page_btn"):
         body = call(
             "POST", "/website/pages",
             json={"branch_id": branch_id, "slug": slug, "widgets": [{"widget_type": widget_type, "order_index": 0}]},
@@ -479,20 +484,20 @@ with tab_website:
 
     st.divider()
     st.caption(t("update_page_caption"))
-    page_id = st.text_input(t("page_id"), value=st.session_state.last_page_id or "")
-    new_widget_type = st.text_input(t("new_widget_type"), value="ServiceCards")
-    if st.button(t("update_page")):
+    page_id = st.text_input(t("page_id"), value=st.session_state.last_page_id or "", key="website_page_id")
+    new_widget_type = st.text_input(t("new_widget_type"), value="ServiceCards", key="website_new_widget_type")
+    if st.button(t("update_page"), key="website_update_page_btn"):
         call("PUT", f"/website/pages/{page_id}", json={"widgets": [{"widget_type": new_widget_type, "order_index": 0}]})
 
     st.divider()
     st.caption(t("restore_page_caption"))
-    restore_to = st.number_input(t("restore_revision_number"), value=1, min_value=1, step=1)
-    if st.button(t("restore_revision")):
+    restore_to = st.number_input(t("restore_revision_number"), value=1, min_value=1, step=1, key="website_restore_to")
+    if st.button(t("restore_revision"), key="website_restore_btn"):
         call("POST", f"/website/pages/{page_id}/restore", json={"target_revision_number": int(restore_to)})
 
 with tab_products:
     st.subheader("GET /products")
-    if st.button(t("list_products")):
+    if st.button(t("list_products"), key="products_list_btn"):
         body = call("GET", "/products")
         if body:
             st.session_state.last_product_id = body[0]["id"] if body else None
@@ -500,10 +505,10 @@ with tab_products:
 with tab_recipes:
     st.subheader("POST /recipes")
     st.caption(t("recipes_caption"))
-    product_id = st.text_input(t("product_id"), value=st.session_state.last_product_id or "")
-    recipe_name = st.text_input(t("recipe_name"), value="Standard")
-    formula_text = st.text_area(t("formula_json"), value='{"waste_factor": 0.05}')
-    if st.button(t("create_recipe")):
+    product_id = st.text_input(t("product_id"), value=st.session_state.last_product_id or "", key="recipes_product_id")
+    recipe_name = st.text_input(t("recipe_name"), value="Standard", key="recipes_recipe_name")
+    formula_text = st.text_area(t("formula_json"), value='{"waste_factor": 0.05}', key="recipes_formula_text")
+    if st.button(t("create_recipe"), key="recipes_create_btn"):
         try:
             formula = json.loads(formula_text)
         except json.JSONDecodeError as e:
@@ -514,9 +519,9 @@ with tab_recipes:
                 st.session_state.last_recipe_id = body["recipe_id"]
 
     st.divider()
-    recipe_id = st.text_input(t("recipe_id"), value=st.session_state.last_recipe_id or "")
-    new_formula_text = st.text_area(t("new_formula_json"), value='{"waste_factor": 0.08}')
-    if st.button(t("update_recipe")):
+    recipe_id = st.text_input(t("recipe_id"), value=st.session_state.last_recipe_id or "", key="recipes_recipe_id")
+    new_formula_text = st.text_area(t("new_formula_json"), value='{"waste_factor": 0.08}', key="recipes_new_formula_text")
+    if st.button(t("update_recipe"), key="recipes_update_btn"):
         try:
             new_formula = json.loads(new_formula_text)
         except json.JSONDecodeError as e:
@@ -525,29 +530,29 @@ with tab_recipes:
             call("PUT", f"/recipes/{recipe_id}", json={"formula": new_formula})
 
     st.divider()
-    restore_version = st.number_input(t("restore_version_number"), value=1, min_value=1, step=1)
-    if st.button(t("restore_recipe_version")):
+    restore_version = st.number_input(t("restore_version_number"), value=1, min_value=1, step=1, key="recipes_restore_version")
+    if st.button(t("restore_recipe_version"), key="recipes_restore_btn"):
         call("POST", f"/recipes/{recipe_id}/restore", json={"target_version_number": int(restore_version)})
 
 with tab_suppliers:
     st.subheader("POST /suppliers")
-    supplier_name = st.text_input(t("supplier_name"), value="Supplier A")
-    if st.button(t("create_supplier")):
+    supplier_name = st.text_input(t("supplier_name"), value="Supplier A", key="suppliers_supplier_name")
+    if st.button(t("create_supplier"), key="suppliers_create_btn"):
         body = call("POST", "/suppliers", json={"name": supplier_name})
         if body:
             st.session_state.last_supplier_id = body["id"]
 
     st.divider()
     st.caption(t("supplier_quote_caption"))
-    supplier_id = st.text_input(t("supplier_id"), value=st.session_state.last_supplier_id or "")
-    material_description = st.text_input(t("material_description"), value="Metal Sheet Roofing, 0.35mm")
+    supplier_id = st.text_input(t("supplier_id"), value=st.session_state.last_supplier_id or "", key="suppliers_supplier_id")
+    material_description = st.text_input(t("material_description"), value="Metal Sheet Roofing, 0.35mm", key="suppliers_material_description")
     qcol1, qcol2, qcol3 = st.columns(3)
-    quoted_price = qcol1.number_input(t("quoted_price"), value=98.0)
-    validity_days = qcol2.number_input(t("validity_days"), value=14, step=1)
-    lock_days = qcol3.number_input(t("lock_days"), value=30, step=1)
-    lead_time_days = st.number_input(t("lead_time_days"), value=21, step=1)
-    quote_date = st.date_input(t("quote_date"))
-    if st.button(t("create_supplier_quote")):
+    quoted_price = qcol1.number_input(t("quoted_price"), value=98.0, key="suppliers_quoted_price")
+    validity_days = qcol2.number_input(t("validity_days"), value=14, step=1, key="suppliers_validity_days")
+    lock_days = qcol3.number_input(t("lock_days"), value=30, step=1, key="suppliers_lock_days")
+    lead_time_days = st.number_input(t("lead_time_days"), value=21, step=1, key="suppliers_lead_time_days")
+    quote_date = st.date_input(t("quote_date"), key="suppliers_quote_date")
+    if st.button(t("create_supplier_quote"), key="suppliers_create_quote_btn"):
         body = call(
             "POST", "/suppliers/quotes",
             json={
@@ -562,10 +567,10 @@ with tab_suppliers:
 
     st.divider()
     st.caption(t("actual_procurement_caption"))
-    supplier_quote_id = st.text_input(t("supplier_quote_id"), value=st.session_state.last_supplier_quote_id or "")
-    actual_price = st.number_input(t("actual_price"), value=99.5)
-    actual_lead_time = st.number_input(t("actual_lead_time"), value=25, step=1)
-    if st.button(t("record_actual_procurement")):
+    supplier_quote_id = st.text_input(t("supplier_quote_id"), value=st.session_state.last_supplier_quote_id or "", key="suppliers_supplier_quote_id")
+    actual_price = st.number_input(t("actual_price"), value=99.5, key="suppliers_actual_price")
+    actual_lead_time = st.number_input(t("actual_lead_time"), value=25, step=1, key="suppliers_actual_lead_time")
+    if st.button(t("record_actual_procurement"), key="suppliers_record_actual_btn"):
         call(
             "POST", f"/suppliers/quotes/{supplier_quote_id}/actual-procurement",
             json={"actual_price": actual_price, "actual_lead_time_days": int(actual_lead_time)},
@@ -573,10 +578,10 @@ with tab_suppliers:
 
 with tab_raw:
     st.subheader(t("any_endpoint"))
-    method = st.selectbox(t("method"), ["GET", "POST", "PUT"])
-    path = st.text_input(t("path"), value="/business/health")
-    body_text = st.text_area(t("json_body"), value="{}")
-    if st.button(t("send")):
+    method = st.selectbox(t("method"), ["GET", "POST", "PUT"], key="raw_method")
+    path = st.text_input(t("path"), value="/business/health", key="raw_path")
+    body_text = st.text_area(t("json_body"), value="{}", key="raw_body_text")
+    if st.button(t("send"), key="raw_send_btn"):
         try:
             body = json.loads(body_text) if body_text.strip() else None
         except json.JSONDecodeError as e:
