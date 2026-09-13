@@ -3,6 +3,21 @@
 Specialty Contractor Operating System — canonical business platform (Customer / Agent / Business
 modes on one shared data layer). See project conversation history for the full Master Blueprint V1.
 
+## ⚠️ Known limitation: no row-level/tenant authorization
+
+`require_permission` (`app/api/deps.py`) checks permission by resource **type** only — "does
+this role have DRAFT on `quote`" — never by *which specific record*. A role with `quote:DRAFT`
+can configure a canopy against any Site UUID in the database; a role with `quote:COMMIT` can
+confirm any customer's quote. Fine for the internal-staff roles this has been built and tested
+against (estimators/PMs/owners legitimately need company-wide visibility) — **not fine** the
+moment a real `CUSTOMER`-role login exists (Part 24/Part 12's customer portal), since the same
+grant that lets a customer see their own site would let them see everyone else's too.
+
+**Do not wire a real customer-facing login into this system until this is fixed** — needs a
+`User`→`Customer` link plus a per-record ownership check retrofitted onto every site/project/
+quote endpoint. Deliberately not built speculatively (real modeling decisions needed); revisit
+when Customer Mode login is actually on the table.
+
 ## Status
 
 **Phase 0 (platform kernel) complete — Sprints 0.1 through 0.8.** No business features yet (that's
