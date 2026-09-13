@@ -6,6 +6,7 @@ from app.api.routers import (
     canopy,
     critical_specs,
     opportunities,
+    products,
     quotes,
     recipes,
     site_knowledge,
@@ -26,6 +27,7 @@ app.include_router(site_knowledge.router)
 app.include_router(website.router)
 app.include_router(suppliers.router)
 app.include_router(recipes.router)
+app.include_router(products.router)
 
 
 @app.get("/health")

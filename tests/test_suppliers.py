@@ -1,8 +1,9 @@
 from datetime import date
 
+from app.core.models.event import Event
 from app.core.models.supplier import Supplier, SupplierQuote
 from app.domain.fresh_price import market_reference_price, select_procurement_quote
-from app.domain.suppliers import record_actual_procurement, to_price_quote
+from app.domain.suppliers import create_supplier_quote, get_or_create_supplier, record_actual_procurement, to_price_quote
 
 
 def _make_quote(session, supplier_name, price, lock_days):
@@ -56,3 +57,35 @@ def test_record_actual_procurement_fills_actuals_without_touching_the_quoted_fie
     assert quote.actual_lead_time_days == 25
     assert quote.quoted_price == 98.0  # untouched
     assert quote.lead_time_days == 21  # untouched
+
+
+def test_get_or_create_supplier_is_idempotent_on_name(session):
+    first = get_or_create_supplier(session, "Supplier A")
+    second = get_or_create_supplier(session, "Supplier A")
+    session.commit()
+    assert first.id == second.id
+
+
+def test_get_or_create_supplier_records_an_event_only_on_first_creation(session):
+    get_or_create_supplier(session, "Supplier A")
+    get_or_create_supplier(session, "Supplier A")
+    session.commit()
+
+    supplier = get_or_create_supplier(session, "Supplier A")
+    events = session.query(Event).filter_by(entity_type="supplier", entity_id=supplier.id).all()
+    assert len(events) == 1
+
+
+def test_create_supplier_quote_records_an_event(session):
+    supplier = get_or_create_supplier(session, "Supplier A")
+    quote = create_supplier_quote(
+        session, supplier.id, "Metal Sheet Roofing, 0.35mm", 98.0, date(2026, 1, 1),
+        validity_days=14, lock_days=30, lead_time_days=21,
+    )
+    session.commit()
+
+    events = session.query(Event).filter_by(entity_type="supplier_quote", entity_id=quote.id).all()
+    assert len(events) == 1
+    assert events[0].payload["quoted_price"] == 98.0
+    assert quote.supplier_id == supplier.id
+    assert quote.moq is None

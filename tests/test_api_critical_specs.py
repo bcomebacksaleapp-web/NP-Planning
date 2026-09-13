@@ -39,6 +39,37 @@ def _make_spec(session) -> CriticalSpec:
     return spec
 
 
+def _make_project(session):
+    customer = Customer(name="Acme Co")
+    session.add(customer)
+    session.flush()
+    site = Site(customer_id=customer.id, site_type="FACTORY", name="Factory A")
+    session.add(site)
+    session.flush()
+    return create_project(session, site.id, {})
+
+
+def test_create_requires_permission(session, client):
+    project = _make_project(session)
+    response = client.post(
+        "/critical-specs", json={"project_id": str(project.id), "spec_type": "roof_material_model", "description": "TBD"}
+    )
+    assert response.status_code == 401
+
+
+def test_create_critical_spec_starts_in_discussion(session, client):
+    project = _make_project(session)
+    token = _login_with_grant(session, client, "critical_spec", "DRAFT")
+
+    response = client.post(
+        "/critical-specs",
+        json={"project_id": str(project.id), "spec_type": "roof_material_model", "description": "TN Polycarbonate"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["state"] == "DISCUSSION"
+
+
 def test_transition_requires_permission(session, client):
     spec = _make_spec(session)
     response = client.post(f"/critical-specs/{spec.id}/transition", json={"to_state": "PROPOSED"})

@@ -8,9 +8,15 @@ from app.api.deps import require_permission
 from app.core.db import get_db
 from app.core.models.critical_spec import CriticalSpec
 from app.domain.state_machine import InvalidTransitionError
-from app.domain.critical_specs import transition_critical_spec
+from app.domain.critical_specs import create_critical_spec, transition_critical_spec
 
 router = APIRouter(prefix="/critical-specs", tags=["critical-specs"])
+
+
+class CreateCriticalSpecRequest(BaseModel):
+    project_id: uuid.UUID
+    spec_type: str
+    description: str
 
 
 class TransitionCriticalSpecRequest(BaseModel):
@@ -23,6 +29,17 @@ class CriticalSpecResponse(BaseModel):
     spec_type: str
     state: str
     confirmed_by: str | None
+
+
+@router.post("", response_model=CriticalSpecResponse)
+def create_critical_spec_route(
+    body: CreateCriticalSpecRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("critical_spec", "DRAFT")),
+) -> CriticalSpecResponse:
+    spec = create_critical_spec(db, body.project_id, body.spec_type, body.description, actor_user_id=user.id)
+    db.commit()
+    return CriticalSpecResponse(id=spec.id, spec_type=spec.spec_type, state=spec.state, confirmed_by=spec.confirmed_by)
 
 
 @router.post("/{spec_id}/transition", response_model=CriticalSpecResponse)

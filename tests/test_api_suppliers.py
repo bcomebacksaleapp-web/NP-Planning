@@ -37,6 +37,40 @@ def _make_supplier_quote(session) -> SupplierQuote:
     return quote
 
 
+def test_create_supplier_requires_permission(session, client):
+    response = client.post("/suppliers", json={"name": "Supplier A"})
+    assert response.status_code == 401
+
+
+def test_create_supplier_is_idempotent_on_name(session, client):
+    token = _login(session, client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    first = client.post("/suppliers", json={"name": "Supplier A"}, headers=headers)
+    second = client.post("/suppliers", json={"name": "Supplier A"}, headers=headers)
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["id"] == second.json()["id"]
+
+
+def test_create_supplier_quote(session, client):
+    token = _login(session, client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    supplier = client.post("/suppliers", json={"name": "Supplier A"}, headers=headers).json()
+    response = client.post(
+        "/suppliers/quotes",
+        json={
+            "supplier_id": supplier["id"], "material_description": "Metal Sheet", "quoted_price": 98.0,
+            "quote_date": "2026-01-01", "validity_days": 14, "lock_days": 30, "lead_time_days": 21,
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["quoted_price"] == 98.0
+    assert response.json()["actual_procurement_price"] is None
+
+
 def test_record_actual_procurement_requires_permission(session, client):
     quote = _make_supplier_quote(session)
     response = client.post(f"/suppliers/quotes/{quote.id}/actual-procurement", json={"actual_price": 99.5, "actual_lead_time_days": 25})
