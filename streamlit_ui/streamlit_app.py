@@ -98,15 +98,33 @@ if not st.session_state.token:
     st.stop()
 
 (
-    tab_canopy, tab_confirm, tab_business, tab_opportunities, tab_specs, tab_quality,
+    tab_sites, tab_canopy, tab_confirm, tab_business, tab_opportunities, tab_specs, tab_quality,
     tab_knowledge, tab_website, tab_products, tab_recipes, tab_suppliers, tab_raw,
 ) = st.tabs(
     [
-        "Canopy configurator", "Confirm quote", "Business health", "Opportunities",
+        "Sites", "Canopy configurator", "Confirm quote", "Business health", "Opportunities",
         "Critical specs", "Site quality", "Site knowledge", "Website studio", "Products",
         "Recipes", "Suppliers", "Raw API call",
     ]
 )
+
+with tab_sites:
+    st.subheader("POST /sites")
+    st.caption("Most other tabs need a Site ID -- create one here first. customer_name is get-or-create.")
+    customer_name = st.text_input("Customer name", value="Test Customer")
+    site_type = st.selectbox("Site type", ["HOME", "OFFICE", "FACTORY"])
+    site_name = st.text_input("Site name", value="Test Site")
+    site_address = st.text_input("Address (optional)", value="")
+    if st.button("Create site"):
+        body = call(
+            "POST", "/sites",
+            json={
+                "customer_name": customer_name, "site_type": site_type,
+                "name": site_name, "address": site_address or None,
+            },
+        )
+        if body:
+            st.session_state.last_site_id = body["id"]
 
 with tab_canopy:
     st.subheader("POST /canopy/configure")
