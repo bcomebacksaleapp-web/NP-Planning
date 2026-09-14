@@ -46,6 +46,7 @@
   .lang-switch{display:flex;gap:4px;background:rgba(255,255,255,.06);border-radius:999px;padding:3px}
   .lang-switch button{border:none;background:transparent;font-size:1.05rem;line-height:1;padding:5px 8px;border-radius:999px;cursor:pointer;opacity:.55;filter:grayscale(60%)}
   .lang-switch button.active{opacity:1;filter:none;background:rgba(255,255,255,.14)}
+  .lang-switch button.lang-text{font-family:Archivo,sans-serif;font-weight:800;font-size:.72rem;letter-spacing:.03em;color:#f2efe8;filter:none;padding:5px 9px}
   .cta-pill{background:var(--sand);color:var(--steel-deep);font-weight:700;font-size:.85rem;padding:10px 20px;border-radius:999px;text-decoration:none;white-space:nowrap;cursor:pointer;border:none;font-family:var(--content-font)}
 
   .page-header{background:var(--steel-deep);color:#f2efe8;padding:52px 0}
@@ -141,7 +142,7 @@
     <div class="header-right">
       <div class="lang-switch" id="lang-switch">
         <button data-lang="th" title="ไทย">🇹🇭</button>
-        <button data-lang="en" title="English">🇬🇧</button>
+        <button data-lang="en" title="English" class="lang-text">ENG</button>
         <button data-lang="jp" title="日本語">🇯🇵</button>
       </div>
       <button class="cta-pill" data-page="contact" data-slug="contact" id="cta-pill"></button>
