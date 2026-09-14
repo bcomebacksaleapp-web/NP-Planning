@@ -8,7 +8,7 @@ from app.api.deps import require_permission
 from app.core.db import get_db
 from app.core.models.website import WebsitePage, WebsitePageRevision
 from app.domain.revisioning import latest_revision
-from app.domain.website import create_branch, create_page, restore_page_revision, update_page
+from app.domain.website import create_branch, create_page, get_published_page, restore_page_revision, update_page
 
 router = APIRouter(prefix="/website", tags=["website"])
 
@@ -50,6 +50,7 @@ class WidgetOutput(BaseModel):
     widget_type: str
     order_index: int
     content_source: str | None
+    config: dict
 
 
 class PageRevisionResponse(BaseModel):
@@ -63,9 +64,25 @@ def _revision_response(page_id: uuid.UUID, revision: WebsitePageRevision) -> Pag
     return PageRevisionResponse(
         page_id=page_id,
         revision_number=revision.revision_number,
-        widgets=[WidgetOutput(widget_type=w.widget_type, order_index=w.order_index, content_source=w.content_source) for w in revision.widgets],
+        widgets=[
+            WidgetOutput(widget_type=w.widget_type, order_index=w.order_index, content_source=w.content_source, config=w.config)
+            for w in revision.widgets
+        ],
         restored_from_revision_number=revision.restored_from_revision_number,
     )
+
+
+@router.get("/pages/{branch_name}/{slug}", response_model=PageRevisionResponse)
+def get_published_page_route(branch_name: str, slug: str, db: Session = Depends(get_db)) -> PageRevisionResponse:
+    """Deliberately no auth -- this is the read path a real visitor's browser (or a renderer
+    acting on their behalf) hits to display a published page, not an internal CMS operation.
+    Every other /website route is DRAFT-gated because it mutates content; this one only reads
+    whatever the last DRAFT/COMMIT already published.
+    """
+    revision = get_published_page(db, branch_name, slug)
+    if revision is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Page not found")
+    return _revision_response(revision.page_id, revision)
 
 
 @router.post("/branches", response_model=BranchResponse)

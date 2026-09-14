@@ -5,7 +5,23 @@ from sqlalchemy.orm import Session
 
 from app.core.models.website import WebsiteBranch, WebsitePage, WebsitePageRevision, WidgetInstance
 from app.domain.events import record_event
-from app.domain.revisioning import next_revision_number
+from app.domain.revisioning import latest_revision, next_revision_number
+
+
+def get_published_page(session: Session, branch_name: str, slug: str) -> WebsitePageRevision | None:
+    """The read side for anything that renders a page -- a public site renderer, a preview
+    pane, this session's demo Artifact. Returns the CURRENT revision (or None if no branch/page
+    matches), never a specific old one; fetching a past revision is a separate, deliberate
+    action, not something a page-render request should stumble into.
+    """
+    page = session.execute(
+        select(WebsitePage)
+        .join(WebsiteBranch, WebsiteBranch.id == WebsitePage.branch_id)
+        .where(WebsiteBranch.name == branch_name, WebsitePage.slug == slug, WebsitePage.archived_at.is_(None))
+    ).scalar_one_or_none()
+    if page is None:
+        return None
+    return latest_revision(session, WebsitePageRevision, "page_id", page.id)
 
 
 def create_branch(

@@ -35,12 +35,16 @@ def test_create_branch_and_page_and_update_and_restore(session, client):
 
     page_response = client.post(
         "/website/pages",
-        json={"branch_id": branch_id, "slug": "home", "widgets": [{"widget_type": "Hero", "order_index": 0}]},
+        json={
+            "branch_id": branch_id, "slug": "home",
+            "widgets": [{"widget_type": "Hero", "order_index": 0, "config": {"title": "Build a better tomorrow"}}],
+        },
         headers=headers,
     )
     assert page_response.status_code == 200
     assert page_response.json()["revision_number"] == 1
     assert [w["widget_type"] for w in page_response.json()["widgets"]] == ["Hero"]
+    assert page_response.json()["widgets"][0]["config"] == {"title": "Build a better tomorrow"}
 
     page_id = page_response.json()["page_id"]
     update_response = client.put(
@@ -58,3 +62,25 @@ def test_create_branch_and_page_and_update_and_restore(session, client):
     assert restore_response.json()["revision_number"] == 3
     assert restore_response.json()["widgets"][0]["widget_type"] == "Hero"
     assert restore_response.json()["restored_from_revision_number"] == 1
+
+
+def test_get_published_page_requires_no_auth_and_returns_current_revision(session, client):
+    token = _login(session, client)
+    headers = {"Authorization": f"Bearer {token}"}
+    client.post("/website/branches", json={"name": "MAIN"}, headers=headers)
+    client.post(
+        "/website/pages",
+        json={
+            "branch_id": client.post("/website/branches", json={"name": "MAIN2"}, headers=headers).json()["id"],
+            "slug": "home", "widgets": [{"widget_type": "Hero", "order_index": 0, "config": {"title": "Hi"}}],
+        },
+        headers=headers,
+    )
+
+    response = client.get("/website/pages/MAIN2/home")
+    assert response.status_code == 200
+    assert response.json()["widgets"][0]["config"] == {"title": "Hi"}
+
+
+def test_get_published_page_404_when_missing(client):
+    assert client.get("/website/pages/NOSUCH/home").status_code == 404
