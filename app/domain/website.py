@@ -24,6 +24,20 @@ def get_published_page(session: Session, branch_name: str, slug: str) -> Website
     return latest_revision(session, WebsitePageRevision, "page_id", page.id)
 
 
+def list_pages(session: Session, branch_name: str) -> list[WebsitePage]:
+    """Which pages exist under a branch, by slug -- needed by anything that has to let someone
+    pick a page (an editor's page list, a sitemap) rather than already knowing the exact slug
+    to fetch, which get_published_page assumes."""
+    return list(
+        session.execute(
+            select(WebsitePage)
+            .join(WebsiteBranch, WebsiteBranch.id == WebsitePage.branch_id)
+            .where(WebsiteBranch.name == branch_name, WebsitePage.archived_at.is_(None))
+            .order_by(WebsitePage.slug)
+        ).scalars()
+    )
+
+
 def create_branch(
     session: Session, name: str, forked_from_branch_id: uuid.UUID | None = None
 ) -> WebsiteBranch:

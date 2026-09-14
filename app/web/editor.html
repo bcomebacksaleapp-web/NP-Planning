@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>N.S. Construct -- Widget Editor</title>
+<style>
+  :root{ --ink:#15191d; --steel:#4d6b7e; --steel-deep:#232f38; --sand:#c9a96a;
+    --paper:#f6f4ef; --paper-raised:#ffffff; --line:#e2ddd0; --muted:#6b7580; --text:#1c2226; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--text);font-family:system-ui,sans-serif;line-height:1.5}
+  header{background:var(--steel-deep);color:#f2efe8;padding:16px 28px;display:flex;justify-content:space-between;align-items:center}
+  header .title{font-weight:800;letter-spacing:.02em}
+  header .sub{font-size:.75rem;color:#b9c2c9}
+  .wrap{max-width:960px;margin:0 auto;padding:28px}
+  .card{background:var(--paper-raised);border:1px solid var(--line);border-radius:10px;padding:22px;margin-bottom:20px}
+  label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:6px}
+  input,select,textarea{width:100%;font-family:inherit;font-size:.92rem;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--text)}
+  textarea{font-family:ui-monospace,monospace;font-size:.82rem;min-height:160px;white-space:pre}
+  button{font-family:inherit;font-weight:700;font-size:.88rem;padding:10px 18px;border-radius:6px;border:none;cursor:pointer}
+  .btn-primary{background:var(--sand);color:var(--steel-deep)}
+  .btn-secondary{background:var(--paper);border:1px solid var(--line);color:var(--text)}
+  .row{display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap}
+  .row > div{flex:1;min-width:160px}
+  .status{font-size:.82rem;padding:8px 12px;border-radius:6px;margin-top:10px}
+  .status.ok{background:#dcf5e0;color:#1a6b2c}
+  .status.err{background:#fde2e2;color:#a02020}
+  .widget-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .widget-type{font-weight:700;font-size:.9rem}
+  .widget-order{font-size:.75rem;color:var(--muted)}
+  #login-view,#editor-view{display:none}
+  .hint{font-size:.78rem;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+
+<header>
+  <div><div class="title">N.S. Construct — Widget Editor</div><div class="sub">Connected to NP Planning Website Studio API</div></div>
+  <div id="who"></div>
+</header>
+
+<div class="wrap">
+  <div id="login-view" class="card">
+    <div class="row">
+      <div><label>Email</label><input id="login-email" type="email" value="test-admin@example.com"/></div>
+      <div><label>Password</label><input id="login-password" type="password" value="test-admin-password-123"/></div>
+      <div style="flex:0"><button class="btn-primary" id="login-btn">Log in</button></div>
+    </div>
+    <div id="login-status"></div>
+  </div>
+
+  <div id="editor-view">
+    <div class="card">
+      <div class="row">
+        <div><label>Page (slug)</label><select id="page-select"></select></div>
+        <div style="flex:0"><button class="btn-secondary" id="reload-btn">Reload</button></div>
+        <div style="flex:0"><button class="btn-secondary" id="logout-btn">Log out</button></div>
+      </div>
+      <div class="hint">Editing branch <b>NS-CONSTRUCT-THEME1</b>. Saving creates a new revision -- past revisions are kept, never overwritten.</div>
+    </div>
+    <div id="widgets"></div>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+const BRANCH = "NS-CONSTRUCT-THEME1";
+let token = localStorage.getItem("ns-editor-token") || null;
+let currentPageId = null;
+
+function headers() {
+  return token ? { "Authorization": "Bearer " + token, "Content-Type": "application/json; charset=utf-8" } : { "Content-Type": "application/json; charset=utf-8" };
+}
+
+function showView() {
+  document.getElementById("login-view").style.display = token ? "none" : "block";
+  document.getElementById("editor-view").style.display = token ? "block" : "none";
+  document.getElementById("who").textContent = token ? "Logged in" : "";
+}
+
+document.getElementById("login-btn").addEventListener("click", async function () {
+  var email = document.getElementById("login-email").value;
+  var password = document.getElementById("login-password").value;
+  var statusEl = document.getElementById("login-status");
+  try {
+    var res = await fetch(API_BASE + "/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email, password: password }) });
+    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>'; return; }
+    var body = await res.json();
+    token = body.token;
+    localStorage.setItem("ns-editor-token", token);
+    showView();
+    loadPageList();
+  } catch (e) {
+    statusEl.innerHTML = '<div class="status err">' + String(e) + '</div>';
+  }
+});
+
+document.getElementById("logout-btn").addEventListener("click", function () {
+  token = null;
+  localStorage.removeItem("ns-editor-token");
+  showView();
+});
+
+document.getElementById("reload-btn").addEventListener("click", function () {
+  loadPage(document.getElementById("page-select").value);
+});
+
+document.getElementById("page-select").addEventListener("change", function (e) {
+  loadPage(e.target.value);
+});
+
+async function loadPageList() {
+  var res = await fetch(API_BASE + "/website/branches/" + BRANCH + "/pages", { headers: headers() });
+  if (!res.ok) { alert("Could not list pages: " + res.status); return; }
+  var pages = await res.json();
+  var select = document.getElementById("page-select");
+  select.innerHTML = pages.map(function (p) { return '<option value="' + p.slug + '">' + p.slug + '</option>'; }).join("");
+  if (pages.length) loadPage(pages[0].slug);
+}
+
+async function loadPage(slug) {
+  var res = await fetch(API_BASE + "/website/pages/" + BRANCH + "/" + slug, { headers: headers() });
+  if (!res.ok) { alert("Could not load page: " + res.status); return; }
+  var revision = await res.json();
+  currentPageId = revision.page_id;
+  renderWidgets(revision);
+}
+
+function renderWidgets(revision) {
+  var container = document.getElementById("widgets");
+  var widgets = revision.widgets.slice().sort(function (a, b) { return a.order_index - b.order_index; });
+  container.innerHTML =
+    '<div class="card"><div class="widget-head"><div class="widget-type">Revision ' + revision.revision_number + '</div>' +
+    '<div class="widget-order">' + widgets.length + ' widgets</div></div></div>' +
+    widgets.map(function (w, i) {
+      return (
+        '<div class="card" data-widget-index="' + i + '">' +
+          '<div class="widget-head"><div class="widget-type">' + w.widget_type + '</div><div class="widget-order">order_index: ' + w.order_index + '</div></div>' +
+          '<label>config (JSON)</label>' +
+          '<textarea class="config-input">' + escapeHtml(JSON.stringify(w.config, null, 2)) + '</textarea>' +
+          '<div class="hint">widget_type and order_index are structural (not editable here) -- only config, which is where real content (text, image URLs) lives.</div>' +
+        '</div>'
+      );
+    }).join("") +
+    '<div class="card">' +
+      '<button class="btn-primary" id="save-btn">Save as new revision</button>' +
+      '<div id="save-status"></div>' +
+    '</div>';
+
+  document.getElementById("save-btn").addEventListener("click", function () { saveWidgets(widgets); });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; });
+}
+
+async function saveWidgets(originalWidgets) {
+  var statusEl = document.getElementById("save-status");
+  var cards = document.querySelectorAll("[data-widget-index]");
+  var updated = [];
+  try {
+    cards.forEach(function (card, i) {
+      var text = card.querySelector(".config-input").value;
+      var config = JSON.parse(text);
+      var original = originalWidgets[i];
+      updated.push({
+        widget_type: original.widget_type, order_index: original.order_index,
+        content_source: original.content_source, config: config
+      });
+    });
+  } catch (e) {
+    statusEl.innerHTML = '<div class="status err">Invalid JSON in one of the config fields: ' + String(e) + '</div>';
+    return;
+  }
+
+  try {
+    var res = await fetch(API_BASE + "/website/pages/" + currentPageId, {
+      method: "PUT", headers: headers(), body: JSON.stringify({ widgets: updated })
+    });
+    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>'; return; }
+    var revision = await res.json();
+    statusEl.innerHTML = '<div class="status ok">Saved as revision ' + revision.revision_number + '</div>';
+  } catch (e) {
+    statusEl.innerHTML = '<div class="status err">' + String(e) + '</div>';
+  }
+}
+
+showView();
+if (token) loadPageList();
+</script>
+</body>
+</html>

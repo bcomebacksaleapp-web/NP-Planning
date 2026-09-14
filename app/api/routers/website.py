@@ -8,7 +8,7 @@ from app.api.deps import require_permission
 from app.core.db import get_db
 from app.core.models.website import WebsitePage, WebsitePageRevision
 from app.domain.revisioning import latest_revision
-from app.domain.website import create_branch, create_page, get_published_page, restore_page_revision, update_page
+from app.domain.website import create_branch, create_page, get_published_page, list_pages, restore_page_revision, update_page
 
 router = APIRouter(prefix="/website", tags=["website"])
 
@@ -70,6 +70,21 @@ def _revision_response(page_id: uuid.UUID, revision: WebsitePageRevision) -> Pag
         ],
         restored_from_revision_number=revision.restored_from_revision_number,
     )
+
+
+class PageSummary(BaseModel):
+    id: uuid.UUID
+    slug: str
+
+
+@router.get("/branches/{branch_name}/pages", response_model=list[PageSummary])
+def list_pages_route(
+    branch_name: str, db: Session = Depends(get_db), user=Depends(require_permission("website_page", "READ")),
+) -> list[PageSummary]:
+    """For an editor's page picker -- knowing a branch's slugs is itself gated (unlike reading
+    one already-known page, which is public) since it's authoring-side navigation, not what a
+    site visitor needs."""
+    return [PageSummary(id=p.id, slug=p.slug) for p in list_pages(db, branch_name)]
 
 
 @router.get("/pages/{branch_name}/{slug}", response_model=PageRevisionResponse)

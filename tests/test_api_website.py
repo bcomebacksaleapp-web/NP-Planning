@@ -84,3 +84,27 @@ def test_get_published_page_requires_no_auth_and_returns_current_revision(sessio
 
 def test_get_published_page_404_when_missing(client):
     assert client.get("/website/pages/NOSUCH/home").status_code == 404
+
+
+def test_list_pages_requires_permission(client):
+    assert client.get("/website/branches/MAIN/pages").status_code == 401
+
+
+def test_list_pages_returns_slugs_for_branch(session, client):
+    token = _login(session, client)
+    headers = {"Authorization": f"Bearer {token}"}
+    branch_id = client.post("/website/branches", json={"name": "LISTME"}, headers=headers).json()["id"]
+    client.post(
+        "/website/pages",
+        json={"branch_id": branch_id, "slug": "home", "widgets": [{"widget_type": "Hero", "order_index": 0}]},
+        headers=headers,
+    )
+    client.post(
+        "/website/pages",
+        json={"branch_id": branch_id, "slug": "about", "widgets": [{"widget_type": "Prose", "order_index": 0}]},
+        headers=headers,
+    )
+
+    response = client.get("/website/branches/LISTME/pages", headers=headers)
+    assert response.status_code == 200
+    assert sorted(p["slug"] for p in response.json()) == ["about", "home"]

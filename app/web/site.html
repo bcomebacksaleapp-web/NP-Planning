@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>N.S. Construct</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Noto+Sans+Thai:wght@400;500;600;700;900&display=swap">
+<style>
+  :root{
+    /* Project rule: Thai copy must render in Cordia New (a Windows system font -- can't be
+       CDN-loaded, so it's declared first and falls through to a web font where unavailable). */
+    --thai-font:"Cordia New","TH SarabunPSK","Noto Sans Thai",Tahoma,sans-serif;
+    --ink:#15191d; --steel:#4d6b7e; --steel-deep:#232f38; --sand:#c9a96a;
+    --paper:#f6f4ef; --paper-raised:#ffffff; --line:#e2ddd0; --muted:#6b7580;
+    --text:#1c2226; --text-soft:#4a535b; --on-dark:#f2efe8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#eef1f3; --steel:#8fb0c4; --steel-deep:#0e1418; --sand:#d9bd85;
+      --paper:#12161a; --paper-raised:#1a2126; --line:#2a333a; --muted:#8b96a0;
+      --text:#e9edef; --text-soft:#b7c0c6; --on-dark:#12161a;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--text);font-family:var(--thai-font);line-height:1.55}
+  h1,h2,h3{margin:0}
+  .eyebrow{font-family:Archivo,sans-serif;font-weight:800;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--sand)}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 32px}
+  section{padding:76px 0}
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:36px;gap:24px;flex-wrap:wrap}
+  .section-head h2{font-size:1.8rem;font-weight:700}
+
+  header.site{background:var(--steel-deep);color:#f2efe8;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+  header.site .wrap{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand .mark{width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,var(--sand),#a9853f);display:flex;align-items:center;justify-content:center;font-family:Archivo;font-weight:900;color:var(--steel-deep);font-size:1.1rem}
+  .brand .name{font-family:Archivo;font-weight:800;font-size:1.02rem;letter-spacing:.02em}
+  .brand .tag{font-size:.62rem;letter-spacing:.14em;color:#b9c2c9;text-transform:uppercase}
+  nav.primary{display:flex;gap:24px;font-size:.86rem;font-weight:500;color:#d8dee2}
+  nav.primary a{color:inherit;text-decoration:none;padding-bottom:4px;border-bottom:2px solid transparent;cursor:pointer}
+  nav.primary a.active{color:#fff;font-weight:700;border-bottom-color:var(--sand)}
+  .header-right{display:flex;align-items:center;gap:16px}
+  .lang-switch{display:flex;gap:4px;background:rgba(255,255,255,.06);border-radius:999px;padding:3px}
+  .lang-switch button{border:none;background:transparent;font-size:1.05rem;line-height:1;padding:5px 8px;border-radius:999px;cursor:pointer;opacity:.55;filter:grayscale(60%)}
+  .lang-switch button.active{opacity:1;filter:none;background:rgba(255,255,255,.14)}
+  .cta-pill{background:var(--sand);color:var(--steel-deep);font-weight:700;font-size:.85rem;padding:10px 20px;border-radius:999px;text-decoration:none;white-space:nowrap;cursor:pointer;border:none;font-family:var(--thai-font)}
+
+  .page-header{background:var(--steel-deep);color:#f2efe8;padding:52px 0}
+  .page-header h1{font-size:clamp(1.7rem,3vw,2.3rem);font-weight:700;color:#fff;margin:10px 0 0}
+  .page-header p{color:#c3ccd1;max-width:60ch;margin:12px 0 0}
+
+  .btn{font-family:var(--thai-font);font-weight:700;font-size:.95rem;padding:14px 26px;border-radius:6px;text-decoration:none;display:inline-block;border:1px solid transparent;cursor:pointer}
+  .btn.primary{background:var(--sand);color:var(--steel-deep)}
+  .btn.ghost{border-color:rgba(255,255,255,.4);color:#f2efe8;background:transparent}
+
+  .features{background:var(--paper-raised);border-bottom:1px solid var(--line)}
+  .features ul{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:0;padding:0}
+  .features li{list-style:none;padding:26px 28px;border-left:1px solid var(--line);display:flex;gap:14px;align-items:flex-start}
+  .features li:first-child{border-left:none}
+  .features .num{font-family:Archivo;font-weight:900;color:var(--sand);font-size:.85rem}
+  .features p{margin:0;font-weight:600;font-size:.92rem}
+
+  .card-grid,.value-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
+  .plain-card{padding:26px 22px;border:1px solid var(--line);border-radius:10px;background:var(--paper-raised)}
+  .plain-card h3{font-size:1.02rem;font-weight:700;margin-bottom:8px}
+  .plain-card .tags,.plain-card p{font-size:.82rem;color:var(--muted);font-weight:500;margin:0}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-top:8px}
+  .stat-tile{text-align:center;padding:28px 16px;border:1px solid var(--line);border-radius:10px;background:var(--paper-raised)}
+  .stat-tile .value{font-family:Archivo;font-weight:900;font-size:2rem;color:var(--sand)}
+  .stat-tile .label{font-size:.82rem;color:var(--muted);margin-top:6px;font-weight:600}
+  .prose{max-width:70ch;color:var(--text-soft);font-size:1rem;line-height:1.75;margin:0 0 14px}
+
+  .filters{display:flex;gap:10px;margin-bottom:30px;flex-wrap:wrap}
+  .filters span{font-size:.8rem;font-weight:600;padding:8px 16px;border-radius:999px;border:1px solid var(--line);color:var(--text-soft);cursor:pointer}
+  .filters span.active{background:var(--ink);color:var(--on-dark);border-color:var(--ink)}
+  .project-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+  .project-card{border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--paper-raised);padding:16px 18px}
+  .project-card .name{font-weight:700;font-size:.98rem}
+  .project-card .detail{font-size:.82rem;color:var(--muted);margin-top:2px}
+
+  .service-row{display:grid;grid-template-columns:1fr;gap:16px;padding:32px 0;border-bottom:1px solid var(--line)}
+  .service-row:last-child{border-bottom:none}
+  .service-row h2{font-size:1.3rem;font-weight:700;margin:0 0 10px}
+  .service-row p{color:var(--text-soft);font-size:.95rem;margin:0 0 14px}
+  .service-row ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+  .service-row li{font-size:.88rem;color:var(--text);display:flex;gap:8px}
+  .service-row li::before{content:"";width:6px;height:6px;border-radius:999px;background:var(--sand);flex-shrink:0;margin-top:7px}
+
+  .contact-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:44px;align-items:start}
+  .contact-row{display:flex;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
+  .contact-row:first-of-type{border-top:none}
+  .contact-row .label{font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .contact-row .value{font-size:.94rem;color:var(--text);margin-top:2px}
+  .contact-form{background:var(--paper-raised);border:1px solid var(--line);border-radius:10px;padding:32px}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .form-field{display:flex;flex-direction:column;gap:6px}
+  .form-field.full{grid-column:1/-1}
+  .form-field label{font-size:.78rem;font-weight:600;color:var(--text-soft)}
+  .form-field input,.form-field textarea{font-family:var(--thai-font);font-size:.92rem;padding:11px 13px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--text)}
+  .form-note{font-size:.78rem;color:var(--muted);margin-top:14px}
+
+  .cta-banner{background:var(--ink);color:var(--on-dark)}
+  .cta-banner .wrap{display:flex;align-items:center;justify-content:space-between;gap:28px;flex-wrap:wrap;padding:56px 32px}
+  .cta-banner h2{font-family:Archivo;font-weight:900;font-size:1.7rem}
+  .cta-banner p{margin:6px 0 0;opacity:.75;font-weight:500}
+
+  footer{background:var(--steel-deep);color:#aeb8bd;padding:28px 0;font-size:.8rem}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+  .load-note{padding:60px 0;text-align:center;color:var(--muted);font-size:.9rem}
+  .content-lang-note{font-size:.72rem;color:var(--muted);background:color-mix(in srgb, var(--sand) 14%, transparent);border-radius:6px;padding:8px 14px;margin-bottom:24px;display:inline-block}
+
+  @media (max-width:900px){
+    nav.primary{display:none}
+    .features ul,.card-grid,.value-grid,.stat-grid,.project-grid{grid-template-columns:repeat(2,1fr)}
+    .features li{border-left:none;border-top:1px solid var(--line)}
+    .features li:first-child{border-top:none}
+    .contact-grid,.form-row{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="brand">
+      <div class="mark">N</div>
+      <div><div class="name">N.S. CONSTRUCT</div><div class="tag" id="tagline">Build a better tomorrow</div></div>
+    </div>
+    <nav class="primary" id="primary-nav">
+      <a data-page="home" data-slug="home"></a>
+      <a data-page="about" data-slug="about"></a>
+      <a data-page="services" data-slug="services"></a>
+      <a data-page="home" data-slug="home" data-scroll="projects"></a>
+      <a data-page="contact" data-slug="contact"></a>
+    </nav>
+    <div class="header-right">
+      <div class="lang-switch" id="lang-switch">
+        <button data-lang="th" title="ไทย">🇹🇭</button>
+        <button data-lang="en" title="English">🇬🇧</button>
+        <button data-lang="jp" title="日本語">🇯🇵</button>
+      </div>
+      <button class="cta-pill" data-page="contact" data-slug="contact" id="cta-pill"></button>
+    </div>
+  </div>
+</header>
+
+<main id="app">
+  <div class="load-note" id="load-note">Loading…</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span id="footer-copy">© 2026 N.S. Construct</span>
+    <span id="footer-src">Live data from NP Planning Website Studio API</span>
+  </div>
+</footer>
+
+<script>
+const API_BASE = window.location.origin;
+const BRANCH = "NS-CONSTRUCT-THEME1";
+
+/* UI chrome only -- nav labels, buttons, generic field labels. The actual page content
+   (headlines, service copy) is fetched live from the API below and is Thai-only right now,
+   since that's the only language it has ever been authored in; switching UI language does not
+   invent a translation of real content that hasn't been reviewed. */
+const UI = {
+  th: {
+    tagline: "สร้างอนาคตที่ดีกว่า", nav_home: "หน้าแรก", nav_about: "เกี่ยวกับเรา", nav_services: "บริการของเรา",
+    nav_projects: "ผลงานโครงการ", nav_contact: "ติดต่อเรา", cta: "ขอใบเสนอราคา",
+    filter_all: "ทั้งหมด", filter_factory: "โรงงาน", filter_office: "สำนักงาน", filter_home: "บ้านพักอาศัย",
+    see_all: "ดูทั้งหมด", footer_copy: "© 2026 N.S. Construct", footer_src: "ข้อมูลจริงจาก NP Planning Website Studio API",
+    loading: "กำลังโหลด…", content_note: "เนื้อหาหน้านี้มีเฉพาะภาษาไทย (ข้อมูลจริงจากระบบ ยังไม่มีคำแปล)",
+    empty_projects: "ยังไม่มีผลงานในหมวดนี้"
+  },
+  en: {
+    tagline: "Build a better tomorrow", nav_home: "Home", nav_about: "About Us", nav_services: "Services",
+    nav_projects: "Projects", nav_contact: "Contact", cta: "Request a Quote",
+    filter_all: "All", filter_factory: "Factory", filter_office: "Office", filter_home: "Residential",
+    see_all: "See all", footer_copy: "© 2026 N.S. Construct", footer_src: "Live data from NP Planning Website Studio API",
+    loading: "Loading…", content_note: "This page's content is Thai-only (real data from the system, not yet translated)",
+    empty_projects: "No projects in this category yet"
+  },
+  jp: {
+    tagline: "より良い未来を築く", nav_home: "ホーム", nav_about: "会社概要", nav_services: "サービス",
+    nav_projects: "実績", nav_contact: "お問い合わせ", cta: "見積もり依頼",
+    filter_all: "すべて", filter_factory: "工場", filter_office: "オフィス", filter_home: "住宅",
+    see_all: "すべて見る", footer_copy: "© 2026 N.S. Construct", footer_src: "NP Planning Website Studio API のライブデータ",
+    loading: "読み込み中…", content_note: "このページの内容はタイ語のみです（システムの実データ、未翻訳）",
+    empty_projects: "このカテゴリーにはまだ実績がありません"
+  }
+};
+
+let lang = localStorage.getItem("ns-lang") || "th";
+let currentPage = "home";
+const pageCache = {};
+
+function t(key) { return UI[lang][key]; }
+
+function applyChrome() {
+  document.documentElement.lang = lang;
+  document.getElementById("tagline").textContent = t("tagline");
+  document.getElementById("cta-pill").textContent = t("cta");
+  document.getElementById("footer-copy").textContent = t("footer_copy");
+  document.getElementById("footer-src").textContent = t("footer_src");
+  var navLinks = document.querySelectorAll("#primary-nav a");
+  var labels = [t("nav_home"), t("nav_about"), t("nav_services"), t("nav_projects"), t("nav_contact")];
+  navLinks.forEach(function (a, i) { a.textContent = labels[i]; });
+  document.querySelectorAll("#lang-switch button").forEach(function (b) {
+    b.classList.toggle("active", b.dataset.lang === lang);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+
+function widgetHtml(w) {
+  var c = w.config || {};
+  switch (w.widget_type) {
+    case "Hero":
+      return (
+        '<section class="page-header"><div class="wrap">' +
+          '<div class="eyebrow">' + escapeHtml(c.eyebrow) + '</div>' +
+          '<h1>' + escapeHtml(c.headline) + '</h1>' +
+          '<p>' + escapeHtml(c.body) + '</p>' +
+          '<div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">' +
+            '<a class="btn primary" href="#home" data-page="home" data-scroll="projects">' + escapeHtml(c.primary_cta || t("nav_projects")) + '</a>' +
+            '<a class="btn ghost" href="#contact" data-page="contact">' + escapeHtml(c.secondary_cta || t("nav_contact")) + '</a>' +
+          '</div>' +
+        '</div></section>'
+      );
+    case "PageHeader":
+      return (
+        '<section class="page-header"><div class="wrap">' +
+          '<div class="eyebrow">' + escapeHtml(c.eyebrow) + '</div>' +
+          '<h1>' + escapeHtml(c.headline) + '</h1>' +
+          '<p>' + escapeHtml(c.body) + '</p>' +
+        '</div></section>'
+      );
+    case "FeatureRow":
+      return (
+        '<section class="features"><div class="wrap"><ul>' +
+          (c.items || []).map(function (item, i) {
+            return '<li><span class="num">0' + (i + 1) + '</span><p>' + escapeHtml(item) + '</p></li>';
+          }).join("") +
+        '</ul></div></section>'
+      );
+    case "ServiceCards":
+      return (
+        '<section><div class="wrap">' +
+          '<div class="section-head"><h2>' + escapeHtml(c.section_title) + '</h2><span style="font-size:.85rem;font-weight:600;color:var(--steel)">' + t("see_all") + ' →</span></div>' +
+          '<div class="card-grid">' +
+            (c.cards || []).map(function (card) {
+              return '<div class="plain-card"><h3>' + escapeHtml(card.title) + '</h3><div class="tags">' + escapeHtml(card.tags) + '</div></div>';
+            }).join("") +
+          '</div>' +
+        '</div></section>'
+      );
+    case "ServiceDetailList":
+      return (
+        '<section><div class="wrap">' +
+          (c.services || []).map(function (s) {
+            return (
+              '<div class="service-row"><h2>' + escapeHtml(s.title) + '</h2><p>' + escapeHtml(s.desc) + '</p>' +
+                '<ul>' + (s.items || []).map(function (i) { return '<li>' + escapeHtml(i) + '</li>'; }).join("") + '</ul>' +
+              '</div>'
+            );
+          }).join("") +
+        '</div></section>'
+      );
+    case "ProjectGallery": {
+      var id = "pg-" + Math.random().toString(36).slice(2);
+      var cats = c.filters || [t("filter_all")];
+      var projects = c.projects || [];
+      window.setTimeout(function () { wireProjectGallery(id, projects); }, 0);
+      return (
+        '<section id="' + id + '"><div class="wrap">' +
+          '<div class="section-head"><h2>' + escapeHtml(c.section_title) + '</h2><span style="font-size:.85rem;font-weight:600;color:var(--steel)">' + t("see_all") + ' →</span></div>' +
+          '<div class="filters">' +
+            cats.map(function (cat, i) { return '<span data-cat="' + (i === 0 ? "all" : escapeHtml(cat)) + '" class="' + (i === 0 ? "active" : "") + '">' + escapeHtml(cat) + '</span>'; }).join("") +
+          '</div>' +
+          '<div class="project-grid" data-grid></div>' +
+        '</div></section>'
+      );
+    }
+    case "CTABanner":
+      return (
+        '<section class="cta-banner"><div class="wrap">' +
+          '<div><h2>' + escapeHtml(c.headline) + '</h2><p>' + escapeHtml(c.subheadline) + '</p></div>' +
+          '<a class="btn primary" href="#contact" data-page="contact">' + escapeHtml(c.button_label) + '</a>' +
+        '</div></section>'
+      );
+    case "Prose":
+      return '<section><div class="wrap">' + (c.paragraphs || []).map(function (p) { return '<p class="prose">' + escapeHtml(p) + '</p>'; }).join("") + '</div></section>';
+    case "StatGrid":
+      return '<section style="padding-top:0"><div class="wrap"><div class="stat-grid">' +
+        (c.stats || []).map(function (s) { return '<div class="stat-tile"><div class="value">' + escapeHtml(s.value) + '</div><div class="label">' + escapeHtml(s.label) + '</div></div>'; }).join("") +
+        '</div></div></section>';
+    case "ValueGrid":
+      return '<section style="padding-top:0"><div class="wrap"><div class="section-head"><h2>' + escapeHtml(c.section_title) + '</h2></div><div class="value-grid">' +
+        (c.values || []).map(function (v) { return '<div class="plain-card"><h3>' + escapeHtml(v.title) + '</h3><p>' + escapeHtml(v.desc) + '</p></div>'; }).join("") +
+        '</div></div></section>';
+    case "ContactInfo":
+      return (
+        '<div class="contact-info">' +
+          contactRow(t("nav_contact") === "Contact" ? "Address" : "ที่อยู่", c.address) +
+          contactRow(lang === "jp" ? "電話" : (lang === "en" ? "Phone" : "โทรศัพท์"), c.phone) +
+          contactRow(lang === "jp" ? "メール" : (lang === "en" ? "Email" : "อีเมล"), c.email) +
+          contactRow(lang === "jp" ? "営業時間" : (lang === "en" ? "Business Hours" : "เวลาทำการ"), c.hours) +
+          (c.status === "UNVERIFIED_PLACEHOLDER" ? '<p class="content-lang-note">' + escapeHtml(c.note) + '</p>' : "") +
+        '</div>'
+      );
+    case "ContactForm":
+      return (
+        '<form class="contact-form" onsubmit="return false" style="margin-top:0">' +
+          '<div class="form-row">' + formField(c.fields[0]) + formField(c.fields[1]) + '</div>' +
+          '<div class="form-row">' + formField(c.fields[2]) + formField(c.fields[3]) + '</div>' +
+          '<div class="form-row"><div class="form-field full"><label>' + escapeHtml(c.fields[4]) + '</label><textarea rows="5"></textarea></div></div>' +
+          '<button type="submit" class="btn primary" style="width:100%">' + escapeHtml(c.submit_label) + '</button>' +
+          (c.status === "NOT_WIRED" ? '<p class="form-note">' + escapeHtml(c.note) + '</p>' : "") +
+        '</form>'
+      );
+    default:
+      return "";
+  }
+}
+
+function contactRow(label, value) {
+  return '<div class="contact-row"><div><div class="label">' + escapeHtml(label) + '</div><div class="value">' + escapeHtml(value) + '</div></div></div>';
+}
+function formField(label) {
+  return '<div class="form-field"><label>' + escapeHtml(label) + '</label><input type="text"/></div>';
+}
+
+function wireProjectGallery(sectionId, projects) {
+  var section = document.getElementById(sectionId);
+  if (!section) return;
+  var grid = section.querySelector("[data-grid]");
+  function render(cat) {
+    var items = cat === "all" ? projects : projects.filter(function (p) { return p.category === cat || p.category === cat; });
+    grid.innerHTML = items.map(function (p) {
+      return '<div class="project-card"><div class="name">' + escapeHtml(p.name) + '</div><div class="detail">' + escapeHtml(p.detail) + '</div></div>';
+    }).join("") || '<p style="grid-column:1/-1;color:var(--muted);font-size:.9rem">' + t("empty_projects") + '</p>';
+  }
+  section.querySelectorAll(".filters span").forEach(function (el) {
+    el.addEventListener("click", function () {
+      section.querySelectorAll(".filters span").forEach(function (s) { s.classList.remove("active"); });
+      el.classList.add("active");
+      render(el.dataset.cat);
+    });
+  });
+  render("all");
+}
+
+/* Fetches the ContactInfo/ContactForm pair as two widgets that both need to sit inside one
+   .contact-grid wrapper -- handled as a special case in renderPage rather than in widgetHtml,
+   since layout here spans two widgets, unlike every other widget which renders standalone. */
+async function renderPage(slug) {
+  var app = document.getElementById("app");
+  app.innerHTML = '<div class="load-note">' + t("loading") + '</div>';
+
+  var revision = pageCache[slug];
+  if (!revision) {
+    try {
+      var res = await fetch(API_BASE + "/website/pages/" + BRANCH + "/" + slug);
+      if (!res.ok) { app.innerHTML = '<div class="load-note">Page not found: ' + slug + '</div>'; return; }
+      revision = await res.json();
+      pageCache[slug] = revision;
+    } catch (e) {
+      app.innerHTML = '<div class="load-note">Could not reach the API (' + escapeHtml(String(e)) + ')</div>';
+      return;
+    }
+  }
+
+  var widgets = (revision.widgets || []).slice().sort(function (a, b) { return a.order_index - b.order_index; });
+
+  if (slug === "contact") {
+    var info = widgets.find(function (w) { return w.widget_type === "ContactInfo"; });
+    var form = widgets.find(function (w) { return w.widget_type === "ContactForm"; });
+    var header = widgets.find(function (w) { return w.widget_type === "PageHeader"; });
+    app.innerHTML =
+      (header ? widgetHtml(header) : "") +
+      '<section><div class="wrap"><div class="contact-grid">' +
+        (info ? widgetHtml(info) : "") +
+        (form ? widgetHtml(form) : "") +
+      '</div></div></section>';
+  } else {
+    app.innerHTML = widgets.map(widgetHtml).join("");
+  }
+
+  wireInternalLinks();
+}
+
+function wireInternalLinks() {
+  document.querySelectorAll("[data-page]").forEach(function (el) {
+    el.onclick = function (e) {
+      e.preventDefault();
+      goToPage(el.dataset.page, el.dataset.scroll);
+    };
+  });
+}
+
+function goToPage(page, scrollTarget) {
+  currentPage = page;
+  document.querySelectorAll("#primary-nav a").forEach(function (a) {
+    a.classList.toggle("active", a.dataset.page === page && !a.dataset.scroll);
+  });
+  window.scrollTo({ top: 0 });
+  renderPage(page).then(function () {
+    if (scrollTarget) {
+      requestAnimationFrame(function () {
+        var el = document.querySelector("#" + scrollTarget) || document.querySelector('[id^="pg-"]');
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      });
+    }
+  });
+}
+
+document.querySelectorAll("#primary-nav a, #cta-pill").forEach(function (el) {
+  el.addEventListener("click", function (e) {
+    e.preventDefault();
+    goToPage(el.dataset.page, el.dataset.scroll);
+  });
+});
+
+document.querySelectorAll("#lang-switch button").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    lang = btn.dataset.lang;
+    localStorage.setItem("ns-lang", lang);
+    applyChrome();
+    renderPage(currentPage);
+  });
+});
+
+applyChrome();
+goToPage("home");
+</script>
+</body>
+</html>

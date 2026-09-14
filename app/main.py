@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 
 from app.api.routers import (
     auth,
@@ -35,3 +38,19 @@ app.include_router(products.router)
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+_WEB_DIR = Path(__file__).parent / "web"
+
+
+@app.get("/site")
+def website_demo_site() -> FileResponse:
+    """The real N.S. Construct site renderer -- fetches its content client-side from
+    /website/pages/{branch}/{slug} (same origin, so no CORS/CSP issue) instead of hardcoding it,
+    unlike the earlier standalone demo. See app/web/site.html."""
+    return FileResponse(_WEB_DIR / "site.html")
+
+
+@app.get("/site/editor")
+def website_demo_editor() -> FileResponse:
+    return FileResponse(_WEB_DIR / "editor.html")
