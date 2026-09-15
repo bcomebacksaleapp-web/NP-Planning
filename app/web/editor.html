@@ -30,6 +30,22 @@
   .widget-order{font-size:.75rem;color:var(--muted)}
   #login-view,#editor-view{display:none}
   .hint{font-size:.78rem;color:var(--muted);margin-top:6px}
+  .tabs{display:flex;gap:6px;margin-bottom:18px}
+  .tabs button{background:var(--paper-raised);border:1px solid var(--line);color:var(--muted);padding:9px 16px;border-radius:8px 8px 0 0;font-size:.85rem}
+  .tabs button.active{background:var(--ink);color:#f2efe8;border-color:var(--ink)}
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
+  .inquiry-card{background:var(--paper-raised);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:14px}
+  .inquiry-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .inquiry-name{font-weight:700;font-size:.98rem}
+  .inquiry-time{font-size:.75rem;color:var(--muted)}
+  .inquiry-badge{font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:999px;letter-spacing:.03em;text-transform:uppercase}
+  .inquiry-badge.new{background:#fdf0d5;color:#8a5a00}
+  .inquiry-badge.converted{background:#dcf5e0;color:#1a6b2c}
+  .inquiry-meta{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:.82rem;color:var(--text-soft,var(--text))}
+  .inquiry-meta span b{color:var(--muted);font-weight:600;margin-right:4px}
+  .inquiry-message{margin-top:10px;font-size:.88rem;color:var(--text);background:var(--paper);border-radius:6px;padding:10px 12px}
+  .empty-note{color:var(--muted);font-size:.88rem;text-align:center;padding:30px 0}
 </style>
 </head>
 <body>
@@ -50,15 +66,33 @@
   </div>
 
   <div id="editor-view">
-    <div class="card">
-      <div class="row">
-        <div><label>Page (slug)</label><select id="page-select"></select></div>
-        <div style="flex:0"><button class="btn-secondary" id="reload-btn">Reload</button></div>
-        <div style="flex:0"><button class="btn-secondary" id="logout-btn">Log out</button></div>
-      </div>
-      <div class="hint">Editing branch <b>NS-CONSTRUCT-THEME1</b>. Saving creates a new revision -- past revisions are kept, never overwritten.</div>
+    <div class="tabs">
+      <button class="active" data-tab="pages">Pages</button>
+      <button data-tab="inquiries">Inquiries <span id="inquiry-count"></span></button>
+      <span style="flex:1"></span>
+      <button class="btn-secondary" id="logout-btn" style="border-radius:8px 8px 0 0">Log out</button>
     </div>
-    <div id="widgets"></div>
+
+    <div id="pages-tab" class="tab-panel active">
+      <div class="card">
+        <div class="row">
+          <div><label>Page (slug)</label><select id="page-select"></select></div>
+          <div style="flex:0"><button class="btn-secondary" id="reload-btn">Reload</button></div>
+        </div>
+        <div class="hint">Editing branch <b>NS-CONSTRUCT-THEME1</b>. Saving creates a new revision -- past revisions are kept, never overwritten.</div>
+      </div>
+      <div id="widgets"></div>
+    </div>
+
+    <div id="inquiries-tab" class="tab-panel">
+      <div class="card">
+        <div class="row" style="margin-bottom:0">
+          <div class="hint" style="margin-top:0">Submissions from the public contact form on <code>/site</code> -- newest first. Converting a real lead into a Site + Opportunity is still a manual step done elsewhere in the system.</div>
+          <div style="flex:0"><button class="btn-secondary" id="inquiries-reload-btn">Reload</button></div>
+        </div>
+      </div>
+      <div id="inquiries-list"></div>
+    </div>
   </div>
 </div>
 
@@ -103,6 +137,18 @@ document.getElementById("logout-btn").addEventListener("click", function () {
 
 document.getElementById("reload-btn").addEventListener("click", function () {
   loadPage(document.getElementById("page-select").value);
+});
+
+document.getElementById("inquiries-reload-btn").addEventListener("click", loadInquiries);
+
+document.querySelectorAll(".tabs button[data-tab]").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    document.querySelectorAll(".tabs button[data-tab]").forEach(function (b) { b.classList.remove("active"); });
+    btn.classList.add("active");
+    document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("active"); });
+    document.getElementById(btn.dataset.tab + "-tab").classList.add("active");
+    if (btn.dataset.tab === "inquiries") loadInquiries();
+  });
 });
 
 document.getElementById("page-select").addEventListener("change", function (e) {
@@ -183,6 +229,43 @@ async function saveWidgets(originalWidgets) {
   } catch (e) {
     statusEl.innerHTML = '<div class="status err">' + String(e) + '</div>';
   }
+}
+
+async function loadInquiries() {
+  var list = document.getElementById("inquiries-list");
+  list.innerHTML = '<div class="empty-note">Loading…</div>';
+  var res = await fetch(API_BASE + "/inquiries", { headers: headers() });
+  if (!res.ok) {
+    list.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>';
+    document.getElementById("inquiry-count").textContent = "";
+    return;
+  }
+  var inquiries = await res.json();
+  document.getElementById("inquiry-count").textContent = inquiries.length ? "(" + inquiries.length + ")" : "";
+
+  if (!inquiries.length) {
+    list.innerHTML = '<div class="empty-note">No inquiries yet.</div>';
+    return;
+  }
+
+  list.innerHTML = inquiries.map(function (i) {
+    var when = new Date(i.created_at).toLocaleString();
+    var badge = i.converted_to_opportunity_id
+      ? '<span class="inquiry-badge converted">Converted</span>'
+      : '<span class="inquiry-badge new">New</span>';
+    var meta = [];
+    if (i.phone) meta.push('<span><b>Phone</b>' + escapeHtml(i.phone) + '</span>');
+    if (i.email) meta.push('<span><b>Email</b>' + escapeHtml(i.email) + '</span>');
+    if (i.service_interest) meta.push('<span><b>Service</b>' + escapeHtml(i.service_interest) + '</span>');
+    if (i.source_page) meta.push('<span><b>Page</b>' + escapeHtml(i.source_page) + '</span>');
+    return (
+      '<div class="inquiry-card">' +
+        '<div class="inquiry-head"><div class="inquiry-name">' + escapeHtml(i.name) + '</div>' + badge + '<div class="inquiry-time">' + escapeHtml(when) + '</div></div>' +
+        (meta.length ? '<div class="inquiry-meta">' + meta.join("") + '</div>' : "") +
+        (i.message ? '<div class="inquiry-message">' + escapeHtml(i.message) + '</div>' : "") +
+      '</div>'
+    );
+  }).join("");
 }
 
 showView();

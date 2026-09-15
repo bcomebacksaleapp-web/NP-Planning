@@ -24,8 +24,10 @@ def _login(session, client):
 def test_create_inquiry_requires_no_auth(client):
     response = client.post("/inquiries", json={"name": "Somchai", "phone": "081-234-5678"})
     assert response.status_code == 200
-    assert response.json()["name"] == "Somchai"
-    assert response.json()["converted_to_opportunity_id"] is None
+    body = response.json()
+    assert body["name"] == "Somchai"
+    assert body["converted_to_opportunity_id"] is None
+    assert body["created_at"]
 
 
 def test_create_inquiry_accepts_full_form(client):

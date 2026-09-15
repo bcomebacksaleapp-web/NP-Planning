@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -29,6 +30,7 @@ class InquiryResponse(BaseModel):
     message: str | None
     source_page: str | None
     converted_to_opportunity_id: uuid.UUID | None
+    created_at: datetime
 
 
 def _response(inquiry) -> InquiryResponse:
@@ -36,6 +38,7 @@ def _response(inquiry) -> InquiryResponse:
         id=inquiry.id, name=inquiry.name, phone=inquiry.phone, email=inquiry.email,
         service_interest=inquiry.service_interest, message=inquiry.message,
         source_page=inquiry.source_page, converted_to_opportunity_id=inquiry.converted_to_opportunity_id,
+        created_at=inquiry.created_at,
     )
 
 
