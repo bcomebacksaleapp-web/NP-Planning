@@ -343,16 +343,19 @@ function widgetHtml(w) {
           (c.status === "UNVERIFIED_PLACEHOLDER" ? '<p class="content-lang-note">' + escapeHtml(c.note) + '</p>' : "") +
         '</div>'
       );
-    case "ContactForm":
+    case "ContactForm": {
+      var fieldIds = ["cf-name", "cf-phone", "cf-email", "cf-service"];
+      window.setTimeout(function () { wireContactForm(L(c.submit_label)); }, 0);
       return (
-        '<form class="contact-form" onsubmit="return false" style="margin-top:0">' +
-          '<div class="form-row">' + formField(L(c.fields[0])) + formField(L(c.fields[1])) + '</div>' +
-          '<div class="form-row">' + formField(L(c.fields[2])) + formField(L(c.fields[3])) + '</div>' +
-          '<div class="form-row"><div class="form-field full"><label>' + escapeHtml(L(c.fields[4])) + '</label><textarea rows="5"></textarea></div></div>' +
+        '<form class="contact-form" id="contact-form" style="margin-top:0">' +
+          '<div class="form-row">' + formField(L(c.fields[0]), fieldIds[0], true) + formField(L(c.fields[1]), fieldIds[1]) + '</div>' +
+          '<div class="form-row">' + formField(L(c.fields[2]), fieldIds[2]) + formField(L(c.fields[3]), fieldIds[3]) + '</div>' +
+          '<div class="form-row"><div class="form-field full"><label>' + escapeHtml(L(c.fields[4])) + '</label><textarea id="cf-message" rows="5"></textarea></div></div>' +
           '<button type="submit" class="btn primary" style="width:100%">' + escapeHtml(L(c.submit_label)) + '</button>' +
-          (c.status === "NOT_WIRED" ? '<p class="form-note">' + escapeHtml(c.note) + '</p>' : "") +
+          '<div id="cf-status"></div>' +
         '</form>'
       );
+    }
     default:
       return "";
   }
@@ -361,8 +364,45 @@ function widgetHtml(w) {
 function contactRow(label, value) {
   return '<div class="contact-row"><div><div class="label">' + escapeHtml(label) + '</div><div class="value">' + escapeHtml(value) + '</div></div></div>';
 }
-function formField(label) {
-  return '<div class="form-field"><label>' + escapeHtml(label) + '</label><input type="text"/></div>';
+function formField(label, id, required) {
+  return '<div class="form-field"><label>' + escapeHtml(label) + (required ? " *" : "") + '</label><input type="text" id="' + id + '"' + (required ? " required" : "") + '/></div>';
+}
+
+var CF_STATUS_TEXT = {
+  th: { sending: "กำลังส่ง…", ok: "ส่งข้อความเรียบร้อยแล้ว ทีมงานจะติดต่อกลับเร็วๆ นี้", err: "ส่งไม่สำเร็จ ลองใหม่อีกครั้ง หรือติดต่อเราทางโทรศัพท์" },
+  en: { sending: "Sending…", ok: "Message sent -- our team will be in touch soon.", err: "Something went wrong. Please try again or reach us by phone." },
+  jp: { sending: "送信中…", ok: "送信が完了しました。担当者よりご連絡いたします。", err: "送信に失敗しました。もう一度お試しいただくか、お電話でご連絡ください。" }
+};
+
+function wireContactForm(submitLabel) {
+  var form = document.getElementById("contact-form");
+  if (!form) return;
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var name = document.getElementById("cf-name").value.trim();
+    var statusEl = document.getElementById("cf-status");
+    if (!name) { statusEl.innerHTML = '<p class="form-note">' + escapeHtml(CF_STATUS_TEXT[lang].err) + '</p>'; return; }
+
+    statusEl.innerHTML = '<p class="form-note">' + escapeHtml(CF_STATUS_TEXT[lang].sending) + '</p>';
+    var payload = {
+      name: name,
+      phone: document.getElementById("cf-phone").value.trim() || null,
+      email: document.getElementById("cf-email").value.trim() || null,
+      service_interest: document.getElementById("cf-service").value.trim() || null,
+      message: document.getElementById("cf-message").value.trim() || null,
+      source_page: "contact"
+    };
+    try {
+      var res = await fetch(API_BASE + "/inquiries", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      form.reset();
+      statusEl.innerHTML = '<p class="form-note" style="color:#1a6b2c">' + escapeHtml(CF_STATUS_TEXT[lang].ok) + '</p>';
+    } catch (err) {
+      statusEl.innerHTML = '<p class="form-note" style="color:#a02020">' + escapeHtml(CF_STATUS_TEXT[lang].err) + '</p>';
+    }
+  });
 }
 
 function wireProjectGallery(sectionId, projects) {
