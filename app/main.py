@@ -8,6 +8,7 @@ from app.api.routers import (
     business,
     canopy,
     critical_specs,
+    inquiries,
     opportunities,
     products,
     quotes,
@@ -33,6 +34,7 @@ app.include_router(website.router)
 app.include_router(suppliers.router)
 app.include_router(recipes.router)
 app.include_router(products.router)
+app.include_router(inquiries.router)
 
 
 @app.get("/health")
