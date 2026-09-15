@@ -53,6 +53,9 @@
   .page-header{background:var(--steel-deep);color:#f2efe8;padding:52px 0}
   .page-header h1{font-size:clamp(1.7rem,3vw,2.3rem);font-weight:700;color:#fff;margin:10px 0 0}
   .page-header p{color:#c3ccd1;max-width:60ch;margin:12px 0 0}
+  .page-header .wrap.hero-split{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
+  .hero-media{position:relative;aspect-ratio:4/3;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.16)}
+  .hero-media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
 
   .btn{font-family:var(--content-font);font-weight:700;font-size:.95rem;padding:14px 26px;border-radius:6px;text-decoration:none;display:inline-block;border:1px solid transparent;cursor:pointer}
   .btn.primary{background:var(--sand);color:var(--steel-deep)}
@@ -70,6 +73,17 @@
   .plain-card h3{font-size:1.02rem;font-weight:700;margin-bottom:8px}
   .plain-card .tags,.plain-card p{font-size:.82rem;color:var(--muted);font-weight:500;margin:0}
 
+  /* Photo cards -- image fills the card, title/tags sit on a bottom gradient so they stay
+     readable over any photo; hover zooms the photo only (card edges stay put, no layout
+     shift -- the crop is contained by aspect-ratio + overflow:hidden). */
+  .photo-card{position:relative;aspect-ratio:4/3;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--paper-raised)}
+  .photo-card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;transition:transform 300ms ease}
+  .photo-card:hover img{transform:scale(1.045)}
+  .photo-card .overlay{position:absolute;inset:0;background:linear-gradient(180deg, transparent 45%, rgba(10,12,14,.82) 100%)}
+  .photo-card .card-text{position:absolute;left:0;right:0;bottom:0;padding:16px 18px}
+  .photo-card h3,.photo-card .name{color:#fff;font-weight:700;font-size:.98rem;margin:0}
+  .photo-card .tags,.photo-card .detail{color:rgba(255,255,255,.78);font-size:.78rem;font-weight:500;margin-top:3px}
+
   .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-top:8px}
   .stat-tile{text-align:center;padding:28px 16px;border:1px solid var(--line);border-radius:10px;background:var(--paper-raised)}
   .stat-tile .value{font-family:Archivo;font-weight:900;font-size:2rem;color:var(--sand)}
@@ -80,17 +94,18 @@
   .filters span{font-size:.8rem;font-weight:600;padding:8px 16px;border-radius:999px;border:1px solid var(--line);color:var(--text-soft);cursor:pointer}
   .filters span.active{background:var(--ink);color:var(--on-dark);border-color:var(--ink)}
   .project-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
-  .project-card{border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--paper-raised);padding:16px 18px}
-  .project-card .name{font-weight:700;font-size:.98rem}
-  .project-card .detail{font-size:.82rem;color:var(--muted);margin-top:2px}
 
-  .service-row{display:grid;grid-template-columns:1fr;gap:16px;padding:32px 0;border-bottom:1px solid var(--line)}
+  .service-row{display:grid;grid-template-columns:1fr;gap:16px;padding:40px 0;border-bottom:1px solid var(--line)}
+  .service-row.has-media{grid-template-columns:1fr 1fr;gap:40px;align-items:center}
+  .service-row:nth-child(even).has-media .service-row-media{order:2}
   .service-row:last-child{border-bottom:none}
   .service-row h2{font-size:1.3rem;font-weight:700;margin:0 0 10px}
   .service-row p{color:var(--text-soft);font-size:.95rem;margin:0 0 14px}
   .service-row ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
   .service-row li{font-size:.88rem;color:var(--text);display:flex;gap:8px}
   .service-row li::before{content:"";width:6px;height:6px;border-radius:999px;background:var(--sand);flex-shrink:0;margin-top:7px}
+  .service-row-media{position:relative;aspect-ratio:4/3;border-radius:10px;overflow:hidden}
+  .service-row-media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 
   .contact-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:44px;align-items:start}
   .contact-row{display:flex;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
@@ -122,6 +137,7 @@
     .features li{border-left:none;border-top:1px solid var(--line)}
     .features li:first-child{border-top:none}
     .contact-grid,.form-row{grid-template-columns:1fr}
+    .page-header .wrap.hero-split{grid-template-columns:1fr}
   }
 </style>
 </head>
@@ -168,6 +184,7 @@
 
 <script>
 const API_BASE = window.location.origin;
+const IMG_BASE = window.location.origin + "/site-images/";
 const BRANCH = "NS-CONSTRUCT-THEME1";
 
 /* UI chrome only -- nav labels, buttons, generic field labels. The actual page content
@@ -250,18 +267,23 @@ function L(val) {
 function widgetHtml(w) {
   var c = w.config || {};
   switch (w.widget_type) {
-    case "Hero":
+    case "Hero": {
+      var heroImg = c.image ? '<div class="hero-media"><img src="' + IMG_BASE + c.image + '" alt="' + escapeHtml(L(c.headline)) + '" loading="eager"/></div>' : "";
       return (
-        '<section class="page-header"><div class="wrap">' +
-          '<div class="eyebrow">' + escapeHtml(L(c.eyebrow)) + '</div>' +
-          '<h1>' + escapeHtml(L(c.headline)) + '</h1>' +
-          '<p>' + escapeHtml(L(c.body)) + '</p>' +
-          '<div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">' +
-            '<a class="btn primary" href="#home" data-page="home" data-scroll="projects">' + escapeHtml(L(c.primary_cta) || t("nav_projects")) + '</a>' +
-            '<a class="btn ghost" href="#contact" data-page="contact">' + escapeHtml(L(c.secondary_cta) || t("nav_contact")) + '</a>' +
+        '<section class="page-header"><div class="wrap' + (heroImg ? ' hero-split' : '') + '">' +
+          '<div>' +
+            '<div class="eyebrow">' + escapeHtml(L(c.eyebrow)) + '</div>' +
+            '<h1>' + escapeHtml(L(c.headline)) + '</h1>' +
+            '<p>' + escapeHtml(L(c.body)) + '</p>' +
+            '<div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">' +
+              '<a class="btn primary" href="#home" data-page="home" data-scroll="projects">' + escapeHtml(L(c.primary_cta) || t("nav_projects")) + '</a>' +
+              '<a class="btn ghost" href="#contact" data-page="contact">' + escapeHtml(L(c.secondary_cta) || t("nav_contact")) + '</a>' +
+            '</div>' +
           '</div>' +
+          heroImg +
         '</div></section>'
       );
+    }
     case "PageHeader":
       return (
         '<section class="page-header"><div class="wrap">' +
@@ -284,7 +306,16 @@ function widgetHtml(w) {
           '<div class="section-head"><h2>' + escapeHtml(L(c.section_title)) + '</h2><span style="font-size:.85rem;font-weight:600;color:var(--steel)">' + escapeHtml(L(c.see_all_label)) + ' →</span></div>' +
           '<div class="card-grid">' +
             (c.cards || []).map(function (card) {
-              return '<div class="plain-card"><h3>' + escapeHtml(L(card.title)) + '</h3><div class="tags">' + escapeHtml(L(card.tags)) + '</div></div>';
+              if (!card.image) {
+                return '<div class="plain-card"><h3>' + escapeHtml(L(card.title)) + '</h3><div class="tags">' + escapeHtml(L(card.tags)) + '</div></div>';
+              }
+              return (
+                '<div class="photo-card">' +
+                  '<img src="' + IMG_BASE + card.image + '" alt="' + escapeHtml(L(card.title)) + '" loading="lazy"/>' +
+                  '<div class="overlay"></div>' +
+                  '<div class="card-text"><h3>' + escapeHtml(L(card.title)) + '</h3><div class="tags">' + escapeHtml(L(card.tags)) + '</div></div>' +
+                '</div>'
+              );
             }).join("") +
           '</div>' +
         '</div></section>'
@@ -293,9 +324,14 @@ function widgetHtml(w) {
       return (
         '<section><div class="wrap">' +
           (c.services || []).map(function (s) {
+            var media = s.image ? '<div class="service-row-media"><img src="' + IMG_BASE + s.image + '" alt="' + escapeHtml(L(s.title)) + '" loading="lazy"/></div>' : "";
             return (
-              '<div class="service-row"><h2>' + escapeHtml(L(s.title)) + '</h2><p>' + escapeHtml(L(s.desc)) + '</p>' +
-                '<ul>' + (s.items || []).map(function (i) { return '<li>' + escapeHtml(L(i)) + '</li>'; }).join("") + '</ul>' +
+              '<div class="service-row' + (media ? ' has-media' : '') + '">' +
+                (media ? media : "") +
+                '<div>' +
+                  '<h2>' + escapeHtml(L(s.title)) + '</h2><p>' + escapeHtml(L(s.desc)) + '</p>' +
+                  '<ul>' + (s.items || []).map(function (i) { return '<li>' + escapeHtml(L(i)) + '</li>'; }).join("") + '</ul>' +
+                '</div>' +
               '</div>'
             );
           }).join("") +
@@ -412,7 +448,16 @@ function wireProjectGallery(sectionId, projects) {
   function render(cat) {
     var items = cat === "all" ? projects : projects.filter(function (p) { return p.category === cat; });
     grid.innerHTML = items.map(function (p) {
-      return '<div class="project-card"><div class="name">' + escapeHtml(p.name) + '</div><div class="detail">' + escapeHtml(L(p.detail)) + '</div></div>';
+      if (!p.image) {
+        return '<div class="photo-card"><div class="card-text" style="position:static;color:var(--text)"><div class="name" style="color:var(--text)">' + escapeHtml(p.name) + '</div><div class="detail" style="color:var(--muted)">' + escapeHtml(L(p.detail)) + '</div></div></div>';
+      }
+      return (
+        '<div class="photo-card">' +
+          '<img src="' + IMG_BASE + p.image + '" alt="' + escapeHtml(p.name) + '" loading="lazy"/>' +
+          '<div class="overlay"></div>' +
+          '<div class="card-text"><div class="name">' + escapeHtml(p.name) + '</div><div class="detail">' + escapeHtml(L(p.detail)) + '</div></div>' +
+        '</div>'
+      );
     }).join("") || '<p style="grid-column:1/-1;color:var(--muted);font-size:.9rem">' + t("empty_projects") + '</p>';
   }
   section.querySelectorAll(".filters span").forEach(function (el) {

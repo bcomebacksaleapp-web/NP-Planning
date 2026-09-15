@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routers import (
     auth,
@@ -43,6 +44,11 @@ def health() -> dict:
 
 
 _WEB_DIR = Path(__file__).parent / "web"
+
+# Real image files (not placeholder/hardcoded fetches) for the N.S. Construct demo site -- see
+# app/web/images/README.md for provenance. Served from the app itself since there's no other
+# image hosting set up for this project yet.
+app.mount("/site-images", StaticFiles(directory=_WEB_DIR / "images"), name="site-images")
 
 
 @app.get("/site")
