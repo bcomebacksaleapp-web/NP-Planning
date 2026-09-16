@@ -108,3 +108,39 @@ def test_list_pages_returns_slugs_for_branch(session, client):
     response = client.get("/website/branches/LISTME/pages", headers=headers)
     assert response.status_code == 200
     assert sorted(p["slug"] for p in response.json()) == ["about", "home"]
+
+
+def test_get_branch_requires_no_auth_and_defaults_theme(session, client):
+    token = _login(session, client)
+    headers = {"Authorization": f"Bearer {token}"}
+    client.post("/website/branches", json={"name": "THEMEME"}, headers=headers)
+
+    response = client.get("/website/branches/THEMEME")
+    assert response.status_code == 200
+    assert response.json() == {"name": "THEMEME", "theme": "modern-industrial"}
+
+
+def test_get_branch_404_when_missing(client):
+    assert client.get("/website/branches/NOSUCH").status_code == 404
+
+
+def test_set_branch_theme_requires_permission(session, client):
+    token = _login(session, client)
+    headers = {"Authorization": f"Bearer {token}"}
+    client.post("/website/branches", json={"name": "THEMEPERM"}, headers=headers)
+
+    assert client.put("/website/branches/THEMEPERM/theme", json={"theme": "dark-pro"}).status_code == 401
+
+
+def test_set_branch_theme_updates_and_rejects_unknown_theme(session, client):
+    token = _login(session, client)
+    headers = {"Authorization": f"Bearer {token}"}
+    client.post("/website/branches", json={"name": "THEMESET"}, headers=headers)
+
+    response = client.put("/website/branches/THEMESET/theme", json={"theme": "dark-pro"}, headers=headers)
+    assert response.status_code == 200
+    assert response.json() == {"name": "THEMESET", "theme": "dark-pro"}
+    assert client.get("/website/branches/THEMESET").json()["theme"] == "dark-pro"
+
+    bad_response = client.put("/website/branches/THEMESET/theme", json={"theme": "neon-cyberpunk"}, headers=headers)
+    assert bad_response.status_code == 422

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>N.S. Construct</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Noto+Sans+Thai:wght@400;500;600;700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Oswald:wght@500;600;700&family=Inter:wght@600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap">
 <style>
   :root{
     /* Project rule: Thai copy must render in Cordia New (a Windows system font -- can't be
@@ -13,6 +13,10 @@
     --en-font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
     --jp-font:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif;
     --content-font:var(--thai-font);
+    /* Heading font is the one axis a brand theme is allowed to change -- Thai body copy stays
+       Cordia New in every theme (project rule), so themes only vary --heading-font (Latin
+       display type) plus the color palette below. */
+    --heading-font:Archivo,sans-serif;
     --ink:#15191d; --steel:#4d6b7e; --steel-deep:#232f38; --sand:#c9a96a;
     --paper:#f6f4ef; --paper-raised:#ffffff; --line:#e2ddd0; --muted:#6b7580;
     --text:#1c2226; --text-soft:#4a535b; --on-dark:#f2efe8;
@@ -24,10 +28,28 @@
       --text:#e9edef; --text-soft:#b7c0c6; --on-dark:#12161a;
     }
   }
+  /* Brand themes (Website Studio Design tab) -- selected per-branch via
+     PUT /website/branches/{branch}/theme, applied here via [data-brand-theme] on <html>.
+     "modern-industrial" is the default palette above, so it needs no override block.
+     :root[data-brand-theme=...] matches the dark-mode media block's specificity so source
+     order (these rules come after) decides ties, meaning a chosen theme always wins over the
+     visitor's OS light/dark preference. */
+  :root[data-brand-theme="dark-pro"]{
+    --heading-font:Oswald,sans-serif;
+    --ink:#e7edf0; --steel:#4a6a7d; --steel-deep:#0a0d0f; --sand:#4fc3dc;
+    --paper:#0b0d0f; --paper-raised:#15181b; --line:#262b2f; --muted:#8b96a0;
+    --text:#e7edf0; --text-soft:#aeb9c0; --on-dark:#0b0d0f;
+  }
+  :root[data-brand-theme="minimal-architect"]{
+    --heading-font:Inter,sans-serif;
+    --ink:#1c1c1c; --steel:#6b6b6b; --steel-deep:#1c1c1c; --sand:#8a8578;
+    --paper:#ffffff; --paper-raised:#fafaf9; --line:#e4e4e1; --muted:#82807b;
+    --text:#1c1c1c; --text-soft:#55534e; --on-dark:#ffffff;
+  }
   *{box-sizing:border-box}
   body{margin:0;background:var(--paper);color:var(--text);font-family:var(--content-font);line-height:1.55}
   h1,h2,h3{margin:0}
-  .eyebrow{font-family:Archivo,sans-serif;font-weight:800;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--sand)}
+  .eyebrow{font-family:var(--heading-font);font-weight:800;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--sand)}
   .wrap{max-width:1180px;margin:0 auto;padding:0 32px}
   section{padding:76px 0}
   .section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:36px;gap:24px;flex-wrap:wrap}
@@ -36,8 +58,8 @@
   header.site{background:var(--steel-deep);color:#f2efe8;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.08)}
   header.site .wrap{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
   .brand{display:flex;align-items:center;gap:12px}
-  .brand .mark{width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,var(--sand),#a9853f);display:flex;align-items:center;justify-content:center;font-family:Archivo;font-weight:900;color:var(--steel-deep);font-size:1.1rem}
-  .brand .name{font-family:Archivo;font-weight:800;font-size:1.02rem;letter-spacing:.02em}
+  .brand .mark{width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,var(--sand),#a9853f);display:flex;align-items:center;justify-content:center;font-family:var(--heading-font);font-weight:900;color:var(--steel-deep);font-size:1.1rem}
+  .brand .name{font-family:var(--heading-font);font-weight:800;font-size:1.02rem;letter-spacing:.02em}
   .brand .tag{font-size:.62rem;letter-spacing:.14em;color:#b9c2c9;text-transform:uppercase}
   nav.primary{display:flex;gap:24px;font-size:.86rem;font-weight:500;color:#d8dee2}
   nav.primary a{color:inherit;text-decoration:none;padding-bottom:4px;border-bottom:2px solid transparent;cursor:pointer}
@@ -46,7 +68,7 @@
   .lang-switch{display:flex;gap:4px;background:rgba(255,255,255,.06);border-radius:999px;padding:3px}
   .lang-switch button{border:none;background:transparent;line-height:1;padding:5px 6px;border-radius:999px;cursor:pointer;opacity:.55;filter:grayscale(60%);display:flex;align-items:center}
   .lang-switch button.active{opacity:1;filter:none;background:rgba(255,255,255,.14)}
-  .lang-switch button.lang-text{font-family:Archivo,sans-serif;font-weight:800;font-size:.72rem;letter-spacing:.03em;color:#f2efe8;filter:none;padding:5px 9px}
+  .lang-switch button.lang-text{font-family:var(--heading-font);font-weight:800;font-size:.72rem;letter-spacing:.03em;color:#f2efe8;filter:none;padding:5px 9px}
   .flag-icon{width:22px;height:15px;display:block;border-radius:3px}
   .cta-pill{background:var(--sand);color:var(--steel-deep);font-weight:700;font-size:.85rem;padding:10px 20px;border-radius:999px;text-decoration:none;white-space:nowrap;cursor:pointer;border:none;font-family:var(--content-font)}
 
@@ -65,7 +87,7 @@
   .features ul{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:0;padding:0}
   .features li{list-style:none;padding:26px 28px;border-left:1px solid var(--line);display:flex;gap:14px;align-items:flex-start}
   .features li:first-child{border-left:none}
-  .features .num{font-family:Archivo;font-weight:900;color:var(--sand);font-size:.85rem}
+  .features .num{font-family:var(--heading-font);font-weight:900;color:var(--sand);font-size:.85rem}
   .features p{margin:0;font-weight:600;font-size:.92rem}
 
   .card-grid,.value-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
@@ -86,7 +108,7 @@
 
   .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-top:8px}
   .stat-tile{text-align:center;padding:28px 16px;border:1px solid var(--line);border-radius:10px;background:var(--paper-raised)}
-  .stat-tile .value{font-family:Archivo;font-weight:900;font-size:2rem;color:var(--sand)}
+  .stat-tile .value{font-family:var(--heading-font);font-weight:900;font-size:2rem;color:var(--sand)}
   .stat-tile .label{font-size:.82rem;color:var(--muted);margin-top:6px;font-weight:600}
   .prose{max-width:70ch;color:var(--text-soft);font-size:1rem;line-height:1.75;margin:0 0 14px}
 
@@ -122,7 +144,7 @@
 
   .cta-banner{background:var(--ink);color:var(--on-dark)}
   .cta-banner .wrap{display:flex;align-items:center;justify-content:space-between;gap:28px;flex-wrap:wrap;padding:56px 32px}
-  .cta-banner h2{font-family:Archivo;font-weight:900;font-size:1.7rem}
+  .cta-banner h2{font-family:var(--heading-font);font-weight:900;font-size:1.7rem}
   .cta-banner p{margin:6px 0 0;opacity:.75;font-weight:500}
 
   footer{background:var(--steel-deep);color:#aeb8bd;padding:28px 0;font-size:.8rem}
@@ -550,7 +572,24 @@ document.querySelectorAll("#lang-switch button").forEach(function (btn) {
   });
 });
 
+function applyBrandTheme(theme) {
+  document.documentElement.setAttribute("data-brand-theme", theme);
+}
+
+async function loadBrandTheme() {
+  try {
+    var res = await fetch(API_BASE + "/website/branches/" + BRANCH);
+    if (!res.ok) return;
+    var branch = await res.json();
+    applyBrandTheme(branch.theme);
+  } catch (e) {
+    /* Theme is a cosmetic enhancement -- if the branch lookup fails, the page still renders
+       fine with the default modern-industrial palette baked into :root. */
+  }
+}
+
 applyChrome();
+loadBrandTheme();
 goToPage("home");
 </script>
 </body>

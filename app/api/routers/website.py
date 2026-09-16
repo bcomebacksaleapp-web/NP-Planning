@@ -8,7 +8,17 @@ from app.api.deps import require_permission
 from app.core.db import get_db
 from app.core.models.website import WebsitePage, WebsitePageRevision
 from app.domain.revisioning import latest_revision
-from app.domain.website import create_branch, create_page, get_published_page, list_pages, restore_page_revision, update_page
+from app.domain.website import (
+    BRAND_THEMES,
+    create_branch,
+    create_page,
+    get_branch,
+    get_published_page,
+    list_pages,
+    restore_page_revision,
+    set_branch_theme,
+    update_page,
+)
 
 router = APIRouter(prefix="/website", tags=["website"])
 
@@ -16,6 +26,15 @@ router = APIRouter(prefix="/website", tags=["website"])
 class CreateBranchRequest(BaseModel):
     name: str
     forked_from_branch_id: uuid.UUID | None = None
+
+
+class BranchInfoResponse(BaseModel):
+    name: str
+    theme: str
+
+
+class SetBranchThemeRequest(BaseModel):
+    theme: str
 
 
 class BranchResponse(BaseModel):
@@ -85,6 +104,31 @@ def list_pages_route(
     one already-known page, which is public) since it's authoring-side navigation, not what a
     site visitor needs."""
     return [PageSummary(id=p.id, slug=p.slug) for p in list_pages(db, branch_name)]
+
+
+@router.get("/branches/{branch_name}", response_model=BranchInfoResponse)
+def get_branch_route(branch_name: str, db: Session = Depends(get_db)) -> BranchInfoResponse:
+    """Deliberately no auth, same reasoning as get_published_page_route -- the public site
+    renderer needs a branch's brand theme to paint itself before a visitor has ever logged in."""
+    branch = get_branch(db, branch_name)
+    if branch is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Branch not found")
+    return BranchInfoResponse(name=branch.name, theme=branch.theme)
+
+
+@router.put("/branches/{branch_name}/theme", response_model=BranchInfoResponse)
+def set_branch_theme_route(
+    branch_name: str, body: SetBranchThemeRequest, db: Session = Depends(get_db),
+    user=Depends(require_permission("website_page", "DRAFT")),
+) -> BranchInfoResponse:
+    branch = get_branch(db, branch_name)
+    if branch is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Branch not found")
+    if body.theme not in BRAND_THEMES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"theme must be one of {sorted(BRAND_THEMES)}")
+    set_branch_theme(db, branch, body.theme, actor_user_id=user.id)
+    db.commit()
+    return BranchInfoResponse(name=branch.name, theme=branch.theme)
 
 
 @router.get("/pages/{branch_name}/{slug}", response_model=PageRevisionResponse)

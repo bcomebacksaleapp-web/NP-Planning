@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>N.S. Construct -- Widget Editor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@800;900&family=Oswald:wght@600;700&family=Inter:wght@700;800&display=swap">
 <style>
   :root{ --ink:#15191d; --steel:#4d6b7e; --steel-deep:#232f38; --sand:#c9a96a;
     --paper:#f6f4ef; --paper-raised:#ffffff; --line:#e2ddd0; --muted:#6b7580; --text:#1c2226; }
@@ -38,6 +39,15 @@
   .inquiry-card{background:var(--paper-raised);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:14px}
   .inquiry-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
   .inquiry-name{font-weight:700;font-size:.98rem}
+  .theme-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+  .theme-swatch{border:2px solid var(--line);border-radius:10px;overflow:hidden;text-align:left;background:var(--paper-raised);cursor:pointer;padding:0}
+  .theme-swatch.active{border-color:var(--sand)}
+  .theme-swatch .preview{padding:20px 18px 16px;display:flex;flex-direction:column;gap:10px}
+  .theme-swatch .dots{display:flex;gap:6px}
+  .theme-swatch .dot{width:16px;height:16px;border-radius:999px;border:1px solid rgba(0,0,0,.12)}
+  .theme-swatch .sample{font-weight:800;font-size:1.15rem}
+  .theme-swatch .meta{padding:10px 18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:.78rem;color:var(--muted)}
+  .theme-swatch .meta .badge{font-weight:700;color:var(--sand)}
   .inquiry-time{font-size:.75rem;color:var(--muted)}
   .inquiry-badge{font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:999px;letter-spacing:.03em;text-transform:uppercase}
   .inquiry-badge.new{background:#fdf0d5;color:#8a5a00}
@@ -68,6 +78,7 @@
   <div id="editor-view">
     <div class="tabs">
       <button class="active" data-tab="pages">Pages</button>
+      <button data-tab="design">Design</button>
       <button data-tab="inquiries">Inquiries <span id="inquiry-count"></span></button>
       <span style="flex:1"></span>
       <button class="btn-secondary" id="logout-btn" style="border-radius:8px 8px 0 0">Log out</button>
@@ -92,6 +103,14 @@
         </div>
       </div>
       <div id="inquiries-list"></div>
+    </div>
+
+    <div id="design-tab" class="tab-panel">
+      <div class="card">
+        <div class="hint" style="margin-top:0">Brand theme for <b>NS-CONSTRUCT-THEME1</b> -- click a theme to publish it to the live site immediately (no separate revision, this is branch-level, not page content). Thai body copy always renders in Cordia New in every theme; only the color palette and the Latin heading font change.</div>
+      </div>
+      <div id="theme-grid" class="theme-grid"></div>
+      <div id="theme-status"></div>
     </div>
   </div>
 </div>
@@ -148,6 +167,7 @@ document.querySelectorAll(".tabs button[data-tab]").forEach(function (btn) {
     document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("active"); });
     document.getElementById(btn.dataset.tab + "-tab").classList.add("active");
     if (btn.dataset.tab === "inquiries") loadInquiries();
+    if (btn.dataset.tab === "design") loadDesign();
   });
 });
 
@@ -266,6 +286,65 @@ async function loadInquiries() {
       '</div>'
     );
   }).join("");
+}
+
+/* Same 3 brand themes as site.html's [data-brand-theme] CSS blocks -- keep this metadata in
+   sync with that file when adding/adjusting a theme. Color values here are just enough to
+   render a recognizable swatch, not the full palette (site.html owns that). */
+var THEMES = [
+  { key: "modern-industrial", label: "Modern Industrial", font: "Archivo", weight: 900, bg: "#f6f4ef", ink: "#232f38", accent: "#c9a96a" },
+  { key: "dark-pro", label: "Dark Pro", font: "Oswald", weight: 700, bg: "#0b0d0f", ink: "#e7edf0", accent: "#4fc3dc" },
+  { key: "minimal-architect", label: "Minimal Architect", font: "Inter", weight: 800, bg: "#ffffff", ink: "#1c1c1c", accent: "#8a8578" }
+];
+
+async function loadDesign() {
+  var grid = document.getElementById("theme-grid");
+  var statusEl = document.getElementById("theme-status");
+  statusEl.innerHTML = "";
+  grid.innerHTML = '<div class="empty-note">Loading…</div>';
+
+  var res = await fetch(API_BASE + "/website/branches/" + BRANCH);
+  if (!res.ok) {
+    grid.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>';
+    return;
+  }
+  var branch = await res.json();
+  renderThemeGrid(branch.theme);
+}
+
+function renderThemeGrid(activeTheme) {
+  var grid = document.getElementById("theme-grid");
+  grid.innerHTML = THEMES.map(function (theme) {
+    return (
+      '<button class="theme-swatch' + (theme.key === activeTheme ? ' active' : '') + '" data-theme="' + theme.key + '">' +
+        '<div class="preview" style="background:' + theme.bg + ';color:' + theme.ink + '">' +
+          '<div class="dots"><span class="dot" style="background:' + theme.bg + '"></span><span class="dot" style="background:' + theme.ink + '"></span><span class="dot" style="background:' + theme.accent + '"></span></div>' +
+          '<div class="sample" style="font-family:' + theme.font + ',sans-serif;font-weight:' + theme.weight + '">Aa N.S.</div>' +
+        '</div>' +
+        '<div class="meta"><span>' + theme.label + '</span>' + (theme.key === activeTheme ? '<span class="badge">Active</span>' : '<span>' + theme.font + '</span>') + '</div>' +
+      '</button>'
+    );
+  }).join("");
+
+  document.querySelectorAll(".theme-swatch").forEach(function (btn) {
+    btn.addEventListener("click", function () { setTheme(btn.dataset.theme); });
+  });
+}
+
+async function setTheme(theme) {
+  var statusEl = document.getElementById("theme-status");
+  statusEl.innerHTML = "";
+  try {
+    var res = await fetch(API_BASE + "/website/branches/" + BRANCH + "/theme", {
+      method: "PUT", headers: headers(), body: JSON.stringify({ theme: theme })
+    });
+    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>'; return; }
+    var branch = await res.json();
+    renderThemeGrid(branch.theme);
+    statusEl.innerHTML = '<div class="status ok">Live on /site now: ' + branch.theme + '</div>';
+  } catch (e) {
+    statusEl.innerHTML = '<div class="status err">' + String(e) + '</div>';
+  }
 }
 
 showView();

@@ -7,6 +7,29 @@ from app.core.models.website import WebsiteBranch, WebsitePage, WebsitePageRevis
 from app.domain.events import record_event
 from app.domain.revisioning import latest_revision, next_revision_number
 
+# The 3 brand themes from the Website Studio design mockups. Each is a color palette + heading
+# font pairing (site.html applies the CSS side via [data-brand-theme]); Thai body copy always
+# stays Cordia New regardless of theme -- see the project's Thai-font rule.
+BRAND_THEMES = {"modern-industrial", "dark-pro", "minimal-architect"}
+
+
+def get_branch(session: Session, branch_name: str) -> WebsiteBranch | None:
+    """Branch-level info (currently just the brand theme) for anything that needs to know a
+    branch's identity without going through a specific page -- the public site renderer applying
+    the theme, or the editor's Design tab."""
+    return session.execute(select(WebsiteBranch).where(WebsiteBranch.name == branch_name)).scalar_one_or_none()
+
+
+def set_branch_theme(
+    session: Session, branch: WebsiteBranch, theme: str, actor_user_id: uuid.UUID | None = None
+) -> WebsiteBranch:
+    if theme not in BRAND_THEMES:
+        raise ValueError(f"Unknown theme {theme!r}; must be one of {sorted(BRAND_THEMES)}")
+    branch.theme = theme
+    session.flush()
+    record_event(session, "website_branch", branch.id, "theme_changed", {"theme": theme}, actor_user_id)
+    return branch
+
 
 def get_published_page(session: Session, branch_name: str, slug: str) -> WebsitePageRevision | None:
     """The read side for anything that renders a page -- a public site renderer, a preview

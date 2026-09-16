@@ -20,6 +20,7 @@ class WebsiteBranch(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     forked_from_branch_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("website_branches.id"), nullable=True)
+    theme: Mapped[str] = mapped_column(String(32), nullable=False, default="modern-industrial")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
