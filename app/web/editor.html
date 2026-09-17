@@ -48,6 +48,8 @@
   .theme-swatch .sample{font-weight:800;font-size:1.15rem}
   .theme-swatch .meta{padding:10px 18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:.78rem;color:var(--muted)}
   .theme-swatch .meta .badge{font-weight:700;color:var(--sand)}
+  .design-toggle{display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted);font-weight:600;cursor:pointer;padding:0 4px}
+  .design-toggle input{width:auto;accent-color:var(--sand);cursor:pointer}
   .inquiry-time{font-size:.75rem;color:var(--muted)}
   .inquiry-badge{font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:999px;letter-spacing:.03em;text-transform:uppercase}
   .inquiry-badge.new{background:#fdf0d5;color:#8a5a00}
@@ -78,9 +80,10 @@
   <div id="editor-view">
     <div class="tabs">
       <button class="active" data-tab="pages">Pages</button>
-      <button data-tab="design">Design</button>
+      <button data-tab="design" id="design-tab-btn">Design</button>
       <button data-tab="inquiries">Inquiries <span id="inquiry-count"></span></button>
       <span style="flex:1"></span>
+      <label class="design-toggle"><input type="checkbox" id="design-toggle-checkbox" checked>Show Design tab</label>
       <button class="btn-secondary" id="logout-btn" style="border-radius:8px 8px 0 0">Log out</button>
     </div>
 
@@ -130,6 +133,27 @@ function showView() {
   document.getElementById("editor-view").style.display = token ? "block" : "none";
   document.getElementById("who").textContent = token ? "Logged in" : "";
 }
+
+/* Whether the Design tab button is offered at all -- a local, per-browser editor preference
+   (not branch data, so it isn't an API call) for editors who don't want the theme switcher in
+   their way. Defaults to shown, same as before this toggle existed. */
+function applyDesignTabVisibility(show) {
+  var btn = document.getElementById("design-tab-btn");
+  btn.hidden = !show;
+  if (!show && btn.classList.contains("active")) {
+    document.querySelector('.tabs button[data-tab="pages"]').click();
+  }
+}
+
+var designToggle = document.getElementById("design-toggle-checkbox");
+var showDesignTab = localStorage.getItem("ns-editor-show-design") !== "0";
+designToggle.checked = showDesignTab;
+applyDesignTabVisibility(showDesignTab);
+
+designToggle.addEventListener("change", function () {
+  localStorage.setItem("ns-editor-show-design", designToggle.checked ? "1" : "0");
+  applyDesignTabVisibility(designToggle.checked);
+});
 
 document.getElementById("login-btn").addEventListener("click", async function () {
   var email = document.getElementById("login-email").value;
