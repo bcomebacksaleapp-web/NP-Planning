@@ -327,14 +327,19 @@ function widgetHtml(w) {
         '</div></section>'
       );
     }
-    case "PageHeader":
+    case "PageHeader": {
+      var headerImg = c.image ? '<div class="hero-media"><img src="' + IMG_BASE + c.image + '" alt="' + escapeHtml(L(c.headline)) + '" loading="eager"/></div>' : "";
       return (
-        '<section class="page-header"><div class="wrap">' +
-          '<div class="eyebrow">' + escapeHtml(L(c.eyebrow)) + '</div>' +
-          '<h1>' + escapeHtml(L(c.headline)) + '</h1>' +
-          '<p>' + escapeHtml(L(c.body)) + '</p>' +
+        '<section class="page-header"><div class="wrap' + (headerImg ? ' hero-split' : '') + '">' +
+          '<div>' +
+            '<div class="eyebrow">' + escapeHtml(L(c.eyebrow)) + '</div>' +
+            '<h1>' + escapeHtml(L(c.headline)) + '</h1>' +
+            '<p>' + escapeHtml(L(c.body)) + '</p>' +
+          '</div>' +
+          headerImg +
         '</div></section>'
       );
+    }
     case "FeatureRow":
       return (
         '<section class="features"><div class="wrap"><ul>' +
