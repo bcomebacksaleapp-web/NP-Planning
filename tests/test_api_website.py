@@ -117,7 +117,7 @@ def test_get_branch_requires_no_auth_and_defaults_theme(session, client):
 
     response = client.get("/website/branches/THEMEME")
     assert response.status_code == 200
-    assert response.json() == {"name": "THEMEME", "theme": "modern-industrial"}
+    assert response.json() == {"name": "THEMEME", "theme": "modern-industrial", "font_pair": "classic"}
 
 
 def test_get_branch_404_when_missing(client):
@@ -139,8 +139,43 @@ def test_set_branch_theme_updates_and_rejects_unknown_theme(session, client):
 
     response = client.put("/website/branches/THEMESET/theme", json={"theme": "dark-pro"}, headers=headers)
     assert response.status_code == 200
-    assert response.json() == {"name": "THEMESET", "theme": "dark-pro"}
+    assert response.json() == {"name": "THEMESET", "theme": "dark-pro", "font_pair": "classic"}
     assert client.get("/website/branches/THEMESET").json()["theme"] == "dark-pro"
 
     bad_response = client.put("/website/branches/THEMESET/theme", json={"theme": "neon-cyberpunk"}, headers=headers)
     assert bad_response.status_code == 422
+
+
+def test_set_branch_font_pair_requires_permission(session, client):
+    token = _login(session, client)
+    headers = {"Authorization": f"Bearer {token}"}
+    client.post("/website/branches", json={"name": "FONTPERM"}, headers=headers)
+
+    assert client.put("/website/branches/FONTPERM/font", json={"font_pair": "sarabun"}).status_code == 401
+
+
+def test_set_branch_font_pair_updates_and_rejects_unknown_pair(session, client):
+    token = _login(session, client)
+    headers = {"Authorization": f"Bearer {token}"}
+    client.post("/website/branches", json={"name": "FONTSET"}, headers=headers)
+
+    response = client.put("/website/branches/FONTSET/font", json={"font_pair": "sarabun"}, headers=headers)
+    assert response.status_code == 200
+    assert response.json() == {"name": "FONTSET", "theme": "modern-industrial", "font_pair": "sarabun"}
+    assert client.get("/website/branches/FONTSET").json()["font_pair"] == "sarabun"
+
+    bad_response = client.put("/website/branches/FONTSET/font", json={"font_pair": "comic-sans"}, headers=headers)
+    assert bad_response.status_code == 422
+
+
+def test_theme_and_font_pair_are_independent(session, client):
+    token = _login(session, client)
+    headers = {"Authorization": f"Bearer {token}"}
+    client.post("/website/branches", json={"name": "INDEP"}, headers=headers)
+
+    client.put("/website/branches/INDEP/theme", json={"theme": "dark-pro"}, headers=headers)
+    client.put("/website/branches/INDEP/font", json={"font_pair": "prompt"}, headers=headers)
+
+    body = client.get("/website/branches/INDEP").json()
+    assert body["theme"] == "dark-pro"
+    assert body["font_pair"] == "prompt"

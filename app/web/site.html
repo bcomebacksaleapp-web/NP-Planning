@@ -4,18 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>N.S. Construct</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Oswald:wght@500;600;700&family=Inter:wght@600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Oswald:wght@500;600;700&family=Inter:wght@600;700;800&family=Sarabun:wght@400;500;600;700;800&family=Prompt:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap">
 <style>
   :root{
-    /* Project rule: Thai copy must render in Cordia New (a Windows system font -- can't be
-       CDN-loaded, so it's declared first and falls through to a web font where unavailable). */
+    /* "classic" font pairing (the default) -- Cordia New is a Windows system font, so it's
+       declared first and falls through to a web font where unavailable. See [data-font-pair]
+       below for the other pairings a branch can choose instead; font is independent of color
+       theme (below that), so either can change without the other. */
     --thai-font:"Cordia New","TH SarabunPSK","Noto Sans Thai",Tahoma,sans-serif;
     --en-font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
     --jp-font:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif;
     --content-font:var(--thai-font);
-    /* Heading font is the one axis a brand theme is allowed to change -- Thai body copy stays
-       Cordia New in every theme (project rule), so themes only vary --heading-font (Latin
-       display type) plus the color palette below. */
     --heading-font:Archivo,sans-serif;
     --ink:#15191d; --steel:#4d6b7e; --steel-deep:#232f38; --sand:#c9a96a;
     --paper:#f6f4ef; --paper-raised:#ffffff; --line:#e2ddd0; --muted:#6b7580;
@@ -28,23 +27,36 @@
       --text:#e9edef; --text-soft:#b7c0c6; --on-dark:#12161a;
     }
   }
-  /* Brand themes (Website Studio Design tab) -- selected per-branch via
+  /* Brand themes (Website Studio Design tab) -- color palette ONLY, selected per-branch via
      PUT /website/branches/{branch}/theme, applied here via [data-brand-theme] on <html>.
      "modern-industrial" is the default palette above, so it needs no override block.
      :root[data-brand-theme=...] matches the dark-mode media block's specificity so source
      order (these rules come after) decides ties, meaning a chosen theme always wins over the
      visitor's OS light/dark preference. */
   :root[data-brand-theme="dark-pro"]{
-    --heading-font:Oswald,sans-serif;
     --ink:#e7edf0; --steel:#4a6a7d; --steel-deep:#0a0d0f; --sand:#4fc3dc;
     --paper:#0b0d0f; --paper-raised:#15181b; --line:#262b2f; --muted:#8b96a0;
     --text:#e7edf0; --text-soft:#aeb9c0; --on-dark:#0b0d0f;
   }
   :root[data-brand-theme="minimal-architect"]{
-    --heading-font:Inter,sans-serif;
     --ink:#1c1c1c; --steel:#6b6b6b; --steel-deep:#1c1c1c; --sand:#8a8578;
     --paper:#ffffff; --paper-raised:#fafaf9; --line:#e4e4e1; --muted:#82807b;
     --text:#1c1c1c; --text-soft:#55534e; --on-dark:#ffffff;
+  }
+  /* Font pairings -- Thai body font + Latin heading font, independent of the color theme above.
+     Selected per-branch via PUT /website/branches/{branch}/font, applied via [data-font-pair].
+     "classic" (Cordia New + Archivo) is the default set above, so it needs no override block. */
+  :root[data-font-pair="noto-modern"]{
+    --thai-font:"Noto Sans Thai",Tahoma,sans-serif;
+    --heading-font:Archivo,sans-serif;
+  }
+  :root[data-font-pair="sarabun"]{
+    --thai-font:"Sarabun","Noto Sans Thai",Tahoma,sans-serif;
+    --heading-font:Sarabun,sans-serif;
+  }
+  :root[data-font-pair="prompt"]{
+    --thai-font:Prompt,"Noto Sans Thai",Tahoma,sans-serif;
+    --heading-font:Prompt,sans-serif;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--paper);color:var(--text);font-family:var(--content-font);line-height:1.55}
@@ -581,8 +593,9 @@ document.querySelectorAll("#lang-switch button").forEach(function (btn) {
   });
 });
 
-function applyBrandTheme(theme) {
+function applyBrandTheme(theme, fontPair) {
   document.documentElement.setAttribute("data-brand-theme", theme);
+  document.documentElement.setAttribute("data-font-pair", fontPair);
 }
 
 async function loadBrandTheme() {
@@ -590,10 +603,10 @@ async function loadBrandTheme() {
     var res = await fetch(API_BASE + "/website/branches/" + BRANCH);
     if (!res.ok) return;
     var branch = await res.json();
-    applyBrandTheme(branch.theme);
+    applyBrandTheme(branch.theme, branch.font_pair);
   } catch (e) {
-    /* Theme is a cosmetic enhancement -- if the branch lookup fails, the page still renders
-       fine with the default modern-industrial palette baked into :root. */
+    /* Theme/font are a cosmetic enhancement -- if the branch lookup fails, the page still
+       renders fine with the default modern-industrial + classic pairing baked into :root. */
   }
 }
 

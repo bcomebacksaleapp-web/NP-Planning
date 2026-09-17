@@ -10,12 +10,14 @@ from app.core.models.website import WebsitePage, WebsitePageRevision
 from app.domain.revisioning import latest_revision
 from app.domain.website import (
     BRAND_THEMES,
+    FONT_PAIRS,
     create_branch,
     create_page,
     get_branch,
     get_published_page,
     list_pages,
     restore_page_revision,
+    set_branch_font_pair,
     set_branch_theme,
     update_page,
 )
@@ -31,10 +33,15 @@ class CreateBranchRequest(BaseModel):
 class BranchInfoResponse(BaseModel):
     name: str
     theme: str
+    font_pair: str
 
 
 class SetBranchThemeRequest(BaseModel):
     theme: str
+
+
+class SetBranchFontPairRequest(BaseModel):
+    font_pair: str
 
 
 class BranchResponse(BaseModel):
@@ -113,7 +120,7 @@ def get_branch_route(branch_name: str, db: Session = Depends(get_db)) -> BranchI
     branch = get_branch(db, branch_name)
     if branch is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Branch not found")
-    return BranchInfoResponse(name=branch.name, theme=branch.theme)
+    return BranchInfoResponse(name=branch.name, theme=branch.theme, font_pair=branch.font_pair)
 
 
 @router.put("/branches/{branch_name}/theme", response_model=BranchInfoResponse)
@@ -128,7 +135,24 @@ def set_branch_theme_route(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"theme must be one of {sorted(BRAND_THEMES)}")
     set_branch_theme(db, branch, body.theme, actor_user_id=user.id)
     db.commit()
-    return BranchInfoResponse(name=branch.name, theme=branch.theme)
+    return BranchInfoResponse(name=branch.name, theme=branch.theme, font_pair=branch.font_pair)
+
+
+@router.put("/branches/{branch_name}/font", response_model=BranchInfoResponse)
+def set_branch_font_pair_route(
+    branch_name: str, body: SetBranchFontPairRequest, db: Session = Depends(get_db),
+    user=Depends(require_permission("website_page", "DRAFT")),
+) -> BranchInfoResponse:
+    """Independent of /theme on purpose -- see FONT_PAIRS' docstring. A caller can change color
+    and typography in either order, or just one without the other."""
+    branch = get_branch(db, branch_name)
+    if branch is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Branch not found")
+    if body.font_pair not in FONT_PAIRS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"font_pair must be one of {sorted(FONT_PAIRS)}")
+    set_branch_font_pair(db, branch, body.font_pair, actor_user_id=user.id)
+    db.commit()
+    return BranchInfoResponse(name=branch.name, theme=branch.theme, font_pair=branch.font_pair)
 
 
 @router.get("/pages/{branch_name}/{slug}", response_model=PageRevisionResponse)

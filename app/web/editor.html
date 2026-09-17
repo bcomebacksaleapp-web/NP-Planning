@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>N.S. Construct -- Widget Editor</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@800;900&family=Oswald:wght@600;700&family=Inter:wght@700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@800;900&family=Oswald:wght@600;700&family=Inter:wght@700;800&family=Sarabun:wght@600;700&family=Prompt:wght@600;700&family=Noto+Sans+Thai:wght@700&display=swap">
 <style>
   :root{ --ink:#15191d; --steel:#4d6b7e; --steel-deep:#232f38; --sand:#c9a96a;
     --paper:#f6f4ef; --paper-raised:#ffffff; --line:#e2ddd0; --muted:#6b7580; --text:#1c2226; }
@@ -48,6 +48,8 @@
   .theme-swatch .sample{font-weight:800;font-size:1.15rem}
   .theme-swatch .meta{padding:10px 18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:.78rem;color:var(--muted)}
   .theme-swatch .meta .badge{font-weight:700;color:var(--sand)}
+  .design-section-title{font-size:.85rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:24px 0 10px}
+  .theme-swatch .sample.thai{font-size:1rem;margin-top:2px}
   .design-toggle{display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted);font-weight:600;cursor:pointer;padding:0 4px}
   .design-toggle input{width:auto;accent-color:var(--sand);cursor:pointer}
   .inquiry-time{font-size:.75rem;color:var(--muted)}
@@ -120,10 +122,16 @@
 
     <div id="design-tab" class="tab-panel">
       <div class="card">
-        <div class="hint" style="margin-top:0">Brand theme for <b>NS-CONSTRUCT-THEME1</b> -- click a theme to publish it to the live site immediately (no separate revision, this is branch-level, not page content). Thai body copy always renders in Cordia New in every theme; only the color palette and the Latin heading font change.</div>
+        <div class="hint" style="margin-top:0">Color theme and font are independent for <b>NS-CONSTRUCT-THEME1</b> -- click either to publish it to the live site immediately (no separate revision, this is branch-level, not page content). Mix and match freely: any color theme works with any font.</div>
       </div>
+
+      <h3 class="design-section-title">Color Theme</h3>
       <div id="theme-grid" class="theme-grid"></div>
       <div id="theme-status"></div>
+
+      <h3 class="design-section-title">Font</h3>
+      <div id="font-grid" class="theme-grid"></div>
+      <div id="font-status"></div>
     </div>
   </div>
 </div>
@@ -392,28 +400,41 @@ async function convertInquiry(inquiryId) {
   }
 }
 
-/* Same 3 brand themes as site.html's [data-brand-theme] CSS blocks -- keep this metadata in
-   sync with that file when adding/adjusting a theme. Color values here are just enough to
-   render a recognizable swatch, not the full palette (site.html owns that). */
+/* Same 3 brand themes as site.html's [data-brand-theme] CSS blocks -- color only now, font is
+   its own independent axis (see FONT_PAIRS below). Keep this metadata in sync with site.html
+   when adding/adjusting a theme -- color values here are just enough to render a recognizable
+   swatch, not the full palette (site.html owns that). */
 var THEMES = [
-  { key: "modern-industrial", label: "Modern Industrial", font: "Archivo", weight: 900, bg: "#f6f4ef", ink: "#232f38", accent: "#c9a96a" },
-  { key: "dark-pro", label: "Dark Pro", font: "Oswald", weight: 700, bg: "#0b0d0f", ink: "#e7edf0", accent: "#4fc3dc" },
-  { key: "minimal-architect", label: "Minimal Architect", font: "Inter", weight: 800, bg: "#ffffff", ink: "#1c1c1c", accent: "#8a8578" }
+  { key: "modern-industrial", label: "Modern Industrial", bg: "#f6f4ef", ink: "#232f38", accent: "#c9a96a" },
+  { key: "dark-pro", label: "Dark Pro", bg: "#0b0d0f", ink: "#e7edf0", accent: "#4fc3dc" },
+  { key: "minimal-architect", label: "Minimal Architect", bg: "#ffffff", ink: "#1c1c1c", accent: "#8a8578" }
+];
+
+/* Same 4 font pairings as site.html's [data-font-pair] CSS blocks. thaiFont/latinFont render
+   real sample text here so a Thai font choice is judged by how it actually looks, not a label. */
+var FONT_PAIRS = [
+  { key: "classic", label: "Classic", thaiFont: "'Cordia New','TH SarabunPSK','Noto Sans Thai',sans-serif", latinFont: "Archivo, sans-serif", weight: 800 },
+  { key: "noto-modern", label: "Noto Modern", thaiFont: "'Noto Sans Thai',sans-serif", latinFont: "Archivo, sans-serif", weight: 800 },
+  { key: "sarabun", label: "Sarabun", thaiFont: "Sarabun,sans-serif", latinFont: "Sarabun, sans-serif", weight: 700 },
+  { key: "prompt", label: "Prompt", thaiFont: "Prompt,sans-serif", latinFont: "Prompt, sans-serif", weight: 700 }
 ];
 
 async function loadDesign() {
-  var grid = document.getElementById("theme-grid");
-  var statusEl = document.getElementById("theme-status");
-  statusEl.innerHTML = "";
-  grid.innerHTML = '<div class="empty-note">Loading…</div>';
+  var themeGrid = document.getElementById("theme-grid");
+  var fontGrid = document.getElementById("font-grid");
+  document.getElementById("theme-status").innerHTML = "";
+  document.getElementById("font-status").innerHTML = "";
+  themeGrid.innerHTML = '<div class="empty-note">Loading…</div>';
+  fontGrid.innerHTML = "";
 
   var res = await fetch(API_BASE + "/website/branches/" + BRANCH);
   if (!res.ok) {
-    grid.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>';
+    themeGrid.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>';
     return;
   }
   var branch = await res.json();
   renderThemeGrid(branch.theme);
+  renderFontGrid(branch.font_pair);
 }
 
 function renderThemeGrid(activeTheme) {
@@ -423,14 +444,13 @@ function renderThemeGrid(activeTheme) {
       '<button class="theme-swatch' + (theme.key === activeTheme ? ' active' : '') + '" data-theme="' + theme.key + '">' +
         '<div class="preview" style="background:' + theme.bg + ';color:' + theme.ink + '">' +
           '<div class="dots"><span class="dot" style="background:' + theme.bg + '"></span><span class="dot" style="background:' + theme.ink + '"></span><span class="dot" style="background:' + theme.accent + '"></span></div>' +
-          '<div class="sample" style="font-family:' + theme.font + ',sans-serif;font-weight:' + theme.weight + '">Aa N.S.</div>' +
         '</div>' +
-        '<div class="meta"><span>' + theme.label + '</span>' + (theme.key === activeTheme ? '<span class="badge">Active</span>' : '<span>' + theme.font + '</span>') + '</div>' +
+        '<div class="meta"><span>' + theme.label + '</span>' + (theme.key === activeTheme ? '<span class="badge">Active</span>' : '') + '</div>' +
       '</button>'
     );
   }).join("");
 
-  document.querySelectorAll(".theme-swatch").forEach(function (btn) {
+  grid.querySelectorAll("[data-theme]").forEach(function (btn) {
     btn.addEventListener("click", function () { setTheme(btn.dataset.theme); });
   });
 }
@@ -446,6 +466,41 @@ async function setTheme(theme) {
     var branch = await res.json();
     renderThemeGrid(branch.theme);
     statusEl.innerHTML = '<div class="status ok">Live on /site now: ' + branch.theme + '</div>';
+  } catch (e) {
+    statusEl.innerHTML = '<div class="status err">' + String(e) + '</div>';
+  }
+}
+
+function renderFontGrid(activeFontPair) {
+  var grid = document.getElementById("font-grid");
+  grid.innerHTML = FONT_PAIRS.map(function (fp) {
+    return (
+      '<button class="theme-swatch' + (fp.key === activeFontPair ? ' active' : '') + '" data-font-pair="' + fp.key + '">' +
+        '<div class="preview">' +
+          '<div class="sample" style="font-family:' + fp.latinFont + ';font-weight:' + fp.weight + '">Aa N.S. Construct</div>' +
+          '<div class="sample thai" style="font-family:' + fp.thaiFont + ';font-weight:' + fp.weight + '">อาคารและโรงงาน</div>' +
+        '</div>' +
+        '<div class="meta"><span>' + fp.label + '</span>' + (fp.key === activeFontPair ? '<span class="badge">Active</span>' : '') + '</div>' +
+      '</button>'
+    );
+  }).join("");
+
+  document.querySelectorAll("[data-font-pair]").forEach(function (btn) {
+    btn.addEventListener("click", function () { setFontPair(btn.dataset.fontPair); });
+  });
+}
+
+async function setFontPair(fontPair) {
+  var statusEl = document.getElementById("font-status");
+  statusEl.innerHTML = "";
+  try {
+    var res = await fetch(API_BASE + "/website/branches/" + BRANCH + "/font", {
+      method: "PUT", headers: headers(), body: JSON.stringify({ font_pair: fontPair })
+    });
+    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>'; return; }
+    var branch = await res.json();
+    renderFontGrid(branch.font_pair);
+    statusEl.innerHTML = '<div class="status ok">Live on /site now: ' + branch.font_pair + '</div>';
   } catch (e) {
     statusEl.innerHTML = '<div class="status err">' + String(e) + '</div>';
   }

@@ -21,6 +21,11 @@ class WebsiteBranch(Base):
     name: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     forked_from_branch_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("website_branches.id"), nullable=True)
     theme: Mapped[str] = mapped_column(String(32), nullable=False, default="modern-industrial")
+    # Independent of `theme` -- theme is color palette only, font_pair is the Thai body font +
+    # Latin heading font pairing. Split apart because a user can want e.g. Dark Pro colors with
+    # Sarabun instead of Oswald; bundling them into one "theme" would force color and typography
+    # to move together with no way to mix and match.
+    font_pair: Mapped[str] = mapped_column(String(32), nullable=False, default="classic")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

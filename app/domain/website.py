@@ -7,16 +7,22 @@ from app.core.models.website import WebsiteBranch, WebsitePage, WebsitePageRevis
 from app.domain.events import record_event
 from app.domain.revisioning import latest_revision, next_revision_number
 
-# The 3 brand themes from the Website Studio design mockups. Each is a color palette + heading
-# font pairing (site.html applies the CSS side via [data-brand-theme]); Thai body copy always
-# stays Cordia New regardless of theme -- see the project's Thai-font rule.
+# The 3 brand themes from the Website Studio design mockups -- color palette only (site.html
+# applies the CSS side via [data-brand-theme]).
 BRAND_THEMES = {"modern-industrial", "dark-pro", "minimal-architect"}
+
+# Font pairings are independent of theme -- each is a Thai body font + Latin heading font,
+# applied via [data-font-pair], so a theme's colors and its typography can be mixed and matched
+# rather than locked together. "classic" (Cordia New) is the default, matching the project's
+# original Thai-font choice; the others exist because that was the only option offered at first
+# and the real need is more Thai font variety, not a single fixed rule.
+FONT_PAIRS = {"classic", "noto-modern", "sarabun", "prompt"}
 
 
 def get_branch(session: Session, branch_name: str) -> WebsiteBranch | None:
-    """Branch-level info (currently just the brand theme) for anything that needs to know a
+    """Branch-level info (brand theme + font pairing) for anything that needs to know a
     branch's identity without going through a specific page -- the public site renderer applying
-    the theme, or the editor's Design tab."""
+    them, or the editor's Design tab."""
     return session.execute(select(WebsiteBranch).where(WebsiteBranch.name == branch_name)).scalar_one_or_none()
 
 
@@ -28,6 +34,17 @@ def set_branch_theme(
     branch.theme = theme
     session.flush()
     record_event(session, "website_branch", branch.id, "theme_changed", {"theme": theme}, actor_user_id)
+    return branch
+
+
+def set_branch_font_pair(
+    session: Session, branch: WebsiteBranch, font_pair: str, actor_user_id: uuid.UUID | None = None
+) -> WebsiteBranch:
+    if font_pair not in FONT_PAIRS:
+        raise ValueError(f"Unknown font_pair {font_pair!r}; must be one of {sorted(FONT_PAIRS)}")
+    branch.font_pair = font_pair
+    session.flush()
+    record_event(session, "website_branch", branch.id, "font_pair_changed", {"font_pair": font_pair}, actor_user_id)
     return branch
 
 
