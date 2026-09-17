@@ -218,17 +218,16 @@ const API_BASE = window.location.origin;
 const IMG_BASE = window.location.origin + "/site-images/";
 const BRANCH = "NS-CONSTRUCT-THEME1";
 
-/* UI chrome only -- nav labels, buttons, generic field labels. The actual page content
-   (headlines, service copy) is fetched live from the API below and is Thai-only right now,
-   since that's the only language it has ever been authored in; switching UI language does not
-   invent a translation of real content that hasn't been reviewed. */
+/* UI chrome only -- nav labels, buttons, generic field labels. Page content (headlines, service
+   copy) is fetched live from the API below and is stored per-language ({th, en, jp} objects on
+   each config field, read via L()); this dictionary never invents a translation on the fly. */
 const UI = {
   th: {
     tagline: "สร้างอนาคตที่ดีกว่า", nav_home: "หน้าแรก", nav_about: "เกี่ยวกับเรา", nav_services: "บริการของเรา",
     nav_projects: "ผลงานโครงการ", nav_contact: "ติดต่อเรา", cta: "ขอใบเสนอราคา",
     filter_all: "ทั้งหมด", filter_factory: "โรงงาน", filter_office: "สำนักงาน", filter_home: "บ้านพักอาศัย",
     see_all: "ดูทั้งหมด", footer_copy: "© 2026 N.S. Construct", footer_src: "ข้อมูลจริงจาก NP Planning Website Studio API",
-    loading: "กำลังโหลด…", content_note: "เนื้อหาหน้านี้มีเฉพาะภาษาไทย (ข้อมูลจริงจากระบบ ยังไม่มีคำแปล)",
+    loading: "กำลังโหลด…",
     empty_projects: "ยังไม่มีผลงานในหมวดนี้",
     label_address: "ที่อยู่", label_phone: "โทรศัพท์", label_email: "อีเมล", label_hours: "เวลาทำการ"
   },
@@ -237,7 +236,7 @@ const UI = {
     nav_projects: "Projects", nav_contact: "Contact", cta: "Request a Quote",
     filter_all: "All", filter_factory: "Factory", filter_office: "Office", filter_home: "Residential",
     see_all: "See all", footer_copy: "© 2026 N.S. Construct", footer_src: "Live data from NP Planning Website Studio API",
-    loading: "Loading…", content_note: "This page's content is Thai-only (real data from the system, not yet translated)",
+    loading: "Loading…",
     empty_projects: "No projects in this category yet",
     label_address: "Address", label_phone: "Phone", label_email: "Email", label_hours: "Business Hours"
   },
@@ -246,7 +245,7 @@ const UI = {
     nav_projects: "実績", nav_contact: "お問い合わせ", cta: "見積もり依頼",
     filter_all: "すべて", filter_factory: "工場", filter_office: "オフィス", filter_home: "住宅",
     see_all: "すべて見る", footer_copy: "© 2026 N.S. Construct", footer_src: "NP Planning Website Studio API のライブデータ",
-    loading: "読み込み中…", content_note: "このページの内容はタイ語のみです（システムの実データ、未翻訳）",
+    loading: "読み込み中…",
     empty_projects: "このカテゴリーにはまだ実績がありません",
     label_address: "住所", label_phone: "電話", label_email: "メール", label_hours: "営業時間"
   }
