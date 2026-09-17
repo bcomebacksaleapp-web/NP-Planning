@@ -57,6 +57,11 @@
   .inquiry-meta{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:.82rem;color:var(--text-soft,var(--text))}
   .inquiry-meta span b{color:var(--muted);font-weight:600;margin-right:4px}
   .inquiry-message{margin-top:10px;font-size:.88rem;color:var(--text);background:var(--paper);border-radius:6px;padding:10px 12px}
+  .inquiry-actions{margin-top:12px}
+  .inquiry-convert-form{margin-top:12px;padding-top:14px;border-top:1px solid var(--line)}
+  .inquiry-convert-form .row > div{min-width:180px}
+  .inquiry-convert-form label{font-size:.72rem}
+  .convert-status{margin-top:4px}
   .empty-note{color:var(--muted);font-size:.88rem;text-align:center;padding:30px 0}
   .view-site-link{color:var(--sand);font-size:.85rem;font-weight:700;text-decoration:none;border:1px solid rgba(201,169,106,.5);border-radius:999px;padding:7px 14px}
   .view-site-link:hover{background:rgba(201,169,106,.12)}
@@ -280,6 +285,8 @@ async function saveWidgets(originalWidgets) {
   }
 }
 
+var SITE_TYPES = ["HOME", "OFFICE", "FACTORY"];
+
 async function loadInquiries() {
   var list = document.getElementById("inquiries-list");
   list.innerHTML = '<div class="empty-note">Loading…</div>';
@@ -307,14 +314,82 @@ async function loadInquiries() {
     if (i.email) meta.push('<span><b>Email</b>' + escapeHtml(i.email) + '</span>');
     if (i.service_interest) meta.push('<span><b>Service</b>' + escapeHtml(i.service_interest) + '</span>');
     if (i.source_page) meta.push('<span><b>Page</b>' + escapeHtml(i.source_page) + '</span>');
+    var actions = i.converted_to_opportunity_id
+      ? ""
+      : (
+          '<div class="inquiry-actions">' +
+            '<button class="btn-secondary convert-btn" data-inquiry-id="' + i.id + '">Convert to Opportunity</button>' +
+          '</div>' +
+          '<div class="inquiry-convert-form" id="convert-form-' + i.id + '" hidden>' +
+            '<div class="row">' +
+              '<div><label>Customer name</label><input class="convert-customer-name" value="' + escapeHtml(i.name) + '"/></div>' +
+              '<div><label>Site type</label><select class="convert-site-type">' +
+                SITE_TYPES.map(function (t) { return '<option value="' + t + '">' + t + '</option>'; }).join("") +
+              '</select></div>' +
+            '</div>' +
+            '<div class="row">' +
+              '<div><label>Site name</label><input class="convert-site-name" placeholder="e.g. ' + escapeHtml(i.name) + ' Factory"/></div>' +
+              '<div><label>Site address (optional)</label><input class="convert-site-address"/></div>' +
+            '</div>' +
+            '<button class="btn-primary convert-submit-btn" data-inquiry-id="' + i.id + '">Create Customer + Site + Opportunity</button>' +
+            '<button class="btn-secondary convert-cancel-btn" data-inquiry-id="' + i.id + '">Cancel</button>' +
+            '<div class="convert-status" id="convert-status-' + i.id + '"></div>' +
+          '</div>'
+        );
     return (
       '<div class="inquiry-card">' +
         '<div class="inquiry-head"><div class="inquiry-name">' + escapeHtml(i.name) + '</div>' + badge + '<div class="inquiry-time">' + escapeHtml(when) + '</div></div>' +
         (meta.length ? '<div class="inquiry-meta">' + meta.join("") + '</div>' : "") +
         (i.message ? '<div class="inquiry-message">' + escapeHtml(i.message) + '</div>' : "") +
+        actions +
       '</div>'
     );
   }).join("");
+
+  document.querySelectorAll(".convert-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.getElementById("convert-form-" + btn.dataset.inquiryId).hidden = false;
+      btn.hidden = true;
+    });
+  });
+  document.querySelectorAll(".convert-cancel-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.getElementById("convert-form-" + btn.dataset.inquiryId).hidden = true;
+      document.querySelector('.convert-btn[data-inquiry-id="' + btn.dataset.inquiryId + '"]').hidden = false;
+    });
+  });
+  document.querySelectorAll(".convert-submit-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () { convertInquiry(btn.dataset.inquiryId); });
+  });
+}
+
+async function convertInquiry(inquiryId) {
+  var form = document.getElementById("convert-form-" + inquiryId);
+  var statusEl = document.getElementById("convert-status-" + inquiryId);
+  var customerName = form.querySelector(".convert-customer-name").value.trim();
+  var siteType = form.querySelector(".convert-site-type").value;
+  var siteName = form.querySelector(".convert-site-name").value.trim();
+  var siteAddress = form.querySelector(".convert-site-address").value.trim();
+
+  if (!customerName || !siteName) {
+    statusEl.innerHTML = '<div class="status err">Customer name and site name are both required.</div>';
+    return;
+  }
+
+  statusEl.innerHTML = '<div class="empty-note">Creating…</div>';
+  try {
+    var res = await fetch(API_BASE + "/inquiries/" + inquiryId + "/convert", {
+      method: "POST", headers: headers(),
+      body: JSON.stringify({
+        customer_name: customerName, site_type: siteType, site_name: siteName,
+        site_address: siteAddress || null,
+      }),
+    });
+    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>'; return; }
+    loadInquiries();
+  } catch (e) {
+    statusEl.innerHTML = '<div class="status err">' + String(e) + '</div>';
+  }
 }
 
 /* Same 3 brand themes as site.html's [data-brand-theme] CSS blocks -- keep this metadata in
