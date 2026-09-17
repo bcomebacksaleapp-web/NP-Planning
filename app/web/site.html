@@ -68,7 +68,6 @@
   .lang-switch{display:flex;gap:4px;background:rgba(255,255,255,.06);border-radius:999px;padding:3px}
   .lang-switch button{border:none;background:transparent;line-height:1;padding:5px 6px;border-radius:999px;cursor:pointer;opacity:.55;filter:grayscale(60%);display:flex;align-items:center}
   .lang-switch button.active{opacity:1;filter:none;background:rgba(255,255,255,.14)}
-  .lang-switch button.lang-text{font-family:var(--heading-font);font-weight:800;font-size:.72rem;letter-spacing:.03em;color:#f2efe8;filter:none;padding:5px 9px}
   .flag-icon{width:22px;height:15px;display:block;border-radius:3px}
   .cta-pill{background:var(--sand);color:var(--steel-deep);font-weight:700;font-size:.85rem;padding:10px 20px;border-radius:999px;text-decoration:none;white-space:nowrap;cursor:pointer;border:none;font-family:var(--content-font)}
 
@@ -183,7 +182,9 @@
         <button data-lang="th" title="ไทย">
           <svg class="flag-icon" viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="20" rx="3" fill="#fff"/><clipPath id="cthai"><rect width="30" height="20" rx="3"/></clipPath><g clip-path="url(#cthai)"><rect y="0" width="30" height="20" fill="#f4f5f8"/><rect y="0" width="30" height="4" fill="#a51931"/><rect y="4" width="30" height="4" fill="#f4f5f8"/><rect y="8" width="30" height="4" fill="#2d2a4a"/><rect y="12" width="30" height="4" fill="#f4f5f8"/><rect y="16" width="30" height="4" fill="#a51931"/></g></svg>
         </button>
-        <button data-lang="en" title="English" class="lang-text">ENG</button>
+        <button data-lang="en" title="English">
+          <svg class="flag-icon" viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg"><clipPath id="cgb"><rect width="30" height="20" rx="3"/></clipPath><g clip-path="url(#cgb)"><rect width="30" height="20" fill="#00247d"/><path d="M0,0 L30,20 M30,0 L0,20" stroke="#fff" stroke-width="4.2"/><path d="M0,0 L30,20 M30,0 L0,20" stroke="#cf142b" stroke-width="2.2"/><path d="M15,0 V20" stroke="#fff" stroke-width="7"/><path d="M0,10 H30" stroke="#fff" stroke-width="7"/><path d="M15,0 V20" stroke="#cf142b" stroke-width="4"/><path d="M0,10 H30" stroke="#cf142b" stroke-width="4"/></g></svg>
+        </button>
         <button data-lang="jp" title="日本語">
           <svg class="flag-icon" viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg"><clipPath id="cjp"><rect width="30" height="20" rx="3"/></clipPath><g clip-path="url(#cjp)"><rect width="30" height="20" fill="#fff"/><circle cx="15" cy="10" r="6" fill="#bc002d"/></g></svg>
         </button>
