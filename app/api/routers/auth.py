@@ -24,6 +24,13 @@ def login_route(body: LoginRequest, db: Session = Depends(get_db)) -> LoginRespo
     try:
         token = login(db, body.email, body.password)
     except InvalidCredentialsError as exc:
+        # A failed attempt on a real user mutates failed_login_attempts/locked_until
+        # (app.domain.auth.login) via session.flush(), not session.commit() -- flush alone
+        # never survives get_db's `finally: db.close()`, which rolls back whatever wasn't
+        # committed. Without this commit, the lockout bookkeeping is silently discarded at the
+        # end of every failed request, and the account can never actually lock. Committing here
+        # is safe even when nothing was mutated (an unknown email, an inactive/archived account).
+        db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
     db.commit()
     return LoginResponse(token=token)
