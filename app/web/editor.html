@@ -202,7 +202,7 @@ document.getElementById("login-btn").addEventListener("click", async function ()
   var statusEl = document.getElementById("login-status");
   try {
     var res = await fetch(API_BASE + "/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email, password: password }) });
-    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>'; return; }
+    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await apiErrorText(res) + '</div>'; return; }
     var body = await res.json();
     token = body.token;
     localStorage.setItem("ns-editor-token", token);
@@ -285,6 +285,19 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; });
 }
 
+/* Every API error in this file is FastAPI's standard {"detail": "..."} shape -- show that
+   message directly instead of the raw JSON blob (readable at the login lockout message, which
+   is the most prominent/first-impression error path in the app, and everywhere else too). Falls
+   back to the raw response text for the rare non-JSON error (a proxy/502 page, for instance). */
+async function apiErrorText(res) {
+  var raw = await res.text();
+  try {
+    var body = JSON.parse(raw);
+    if (body && typeof body.detail === "string") return body.detail;
+  } catch (e) { /* not JSON -- fall through to raw text */ }
+  return raw;
+}
+
 async function saveWidgets(originalWidgets) {
   var statusEl = document.getElementById("save-status");
   var cards = document.querySelectorAll("[data-widget-index]");
@@ -308,7 +321,7 @@ async function saveWidgets(originalWidgets) {
     var res = await fetch(API_BASE + "/website/pages/" + currentPageId, {
       method: "PUT", headers: headers(), body: JSON.stringify({ widgets: updated })
     });
-    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>'; return; }
+    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await apiErrorText(res) + '</div>'; return; }
     var revision = await res.json();
     statusEl.innerHTML = '<div class="status ok">Saved as revision ' + revision.revision_number + '</div>';
   } catch (e) {
@@ -341,7 +354,7 @@ async function loadInquiries() {
   list.innerHTML = '<div class="empty-note">Loading…</div>';
   var res = await fetch(API_BASE + "/inquiries", { headers: headers() });
   if (!res.ok) {
-    list.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>';
+    list.innerHTML = '<div class="status err">' + res.status + ": " + await apiErrorText(res) + '</div>';
     document.getElementById("inquiry-count").textContent = "";
     return;
   }
@@ -469,7 +482,7 @@ async function convertInquiry(inquiryId) {
         site_address: siteAddress || null,
       }),
     });
-    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>'; return; }
+    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await apiErrorText(res) + '</div>'; return; }
     loadInquiries();
   } catch (e) {
     statusEl.innerHTML = '<div class="status err">' + String(e) + '</div>';
@@ -505,7 +518,7 @@ async function loadDesign() {
 
   var res = await fetch(API_BASE + "/website/branches/" + BRANCH);
   if (!res.ok) {
-    themeGrid.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>';
+    themeGrid.innerHTML = '<div class="status err">' + res.status + ": " + await apiErrorText(res) + '</div>';
     return;
   }
   var branch = await res.json();
@@ -538,7 +551,7 @@ async function setTheme(theme) {
     var res = await fetch(API_BASE + "/website/branches/" + BRANCH + "/theme", {
       method: "PUT", headers: headers(), body: JSON.stringify({ theme: theme })
     });
-    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>'; return; }
+    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await apiErrorText(res) + '</div>'; return; }
     var branch = await res.json();
     renderThemeGrid(branch.theme);
     statusEl.innerHTML = '<div class="status ok">Live on /site now: ' + branch.theme + '</div>';
@@ -573,7 +586,7 @@ async function setFontPair(fontPair) {
     var res = await fetch(API_BASE + "/website/branches/" + BRANCH + "/font", {
       method: "PUT", headers: headers(), body: JSON.stringify({ font_pair: fontPair })
     });
-    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await res.text() + '</div>'; return; }
+    if (!res.ok) { statusEl.innerHTML = '<div class="status err">' + res.status + ": " + await apiErrorText(res) + '</div>'; return; }
     var branch = await res.json();
     renderFontGrid(branch.font_pair);
     statusEl.innerHTML = '<div class="status ok">Live on /site now: ' + branch.font_pair + '</div>';
