@@ -36,9 +36,6 @@
   .tabs button.active{background:var(--ink);color:#f2efe8;border-color:var(--ink)}
   .tab-panel{display:none}
   .tab-panel.active{display:block}
-  .inquiry-card{background:var(--paper-raised);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:14px}
-  .inquiry-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
-  .inquiry-name{font-weight:700;font-size:.98rem}
   .theme-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
   .theme-swatch{border:2px solid var(--line);border-radius:10px;overflow:hidden;text-align:left;background:var(--paper-raised);cursor:pointer;padding:0}
   .theme-swatch.active{border-color:var(--sand)}
@@ -52,18 +49,39 @@
   .theme-swatch .sample.thai{font-size:1rem;margin-top:2px}
   .design-toggle{display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted);font-weight:600;cursor:pointer;padding:0 4px}
   .design-toggle input{width:auto;accent-color:var(--sand);cursor:pointer}
-  .inquiry-time{font-size:.75rem;color:var(--muted)}
   .inquiry-badge{font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:999px;letter-spacing:.03em;text-transform:uppercase}
   .inquiry-badge.new{background:#fdf0d5;color:#8a5a00}
   .inquiry-badge.converted{background:#dcf5e0;color:#1a6b2c}
   .inquiry-meta{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:.82rem;color:var(--text-soft,var(--text))}
   .inquiry-meta span b{color:var(--muted);font-weight:600;margin-right:4px}
-  .inquiry-message{margin-top:10px;font-size:.88rem;color:var(--text);background:var(--paper);border-radius:6px;padding:10px 12px}
-  .inquiry-actions{margin-top:12px}
+  .inquiry-message{margin-top:10px;font-size:.88rem;color:var(--text);background:var(--paper);border-radius:6px;padding:10px 12px;white-space:pre-wrap}
+  .inquiry-actions{margin-top:16px}
   .inquiry-convert-form{margin-top:12px;padding-top:14px;border-top:1px solid var(--line)}
   .inquiry-convert-form .row > div{min-width:180px}
   .inquiry-convert-form label{font-size:.72rem}
   .convert-status{margin-top:4px}
+
+  /* Messenger-style inbox: fixed-width scrollable list on the left, selected lead's full
+     detail on the right -- replaces the old flat stack of inquiry cards. */
+  .inbox{display:flex;border:1px solid var(--line);border-radius:10px;background:var(--paper-raised);height:min(640px,75vh);overflow:hidden}
+  .inbox-sidebar{width:300px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--paper)}
+  .inbox-sidebar-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .inbox-sidebar-title{font-weight:800;font-size:.95rem}
+  .inbox-list{flex:1;overflow-y:auto}
+  .inbox-list-item{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--line);background:none;width:100%;text-align:left;font-family:inherit}
+  .inbox-list-item:hover{background:var(--paper-raised)}
+  .inbox-list-item.active{background:color-mix(in srgb, var(--sand) 16%, var(--paper-raised))}
+  .inbox-avatar{width:38px;height:38px;border-radius:999px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.9rem}
+  .inbox-list-item-body{min-width:0;flex:1}
+  .inbox-list-item-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .inbox-list-item-name{font-weight:700;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .inbox-list-item-time{font-size:.68rem;color:var(--muted);flex-shrink:0}
+  .inbox-list-item-preview{font-size:.8rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .inbox-list-item.unread .inbox-list-item-name,.inbox-list-item.unread .inbox-list-item-preview{color:var(--text);font-weight:600}
+  .inbox-unread-dot{width:8px;height:8px;border-radius:999px;background:var(--sand);flex-shrink:0;margin-top:5px}
+  .inbox-detail{flex:1;overflow-y:auto;padding:24px 28px}
+  .inbox-detail-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:4px}
+  .inbox-detail-name{font-weight:800;font-size:1.15rem}
   .empty-note{color:var(--muted);font-size:.88rem;text-align:center;padding:30px 0}
   .view-site-link{color:var(--sand);font-size:.85rem;font-weight:700;text-decoration:none;border:1px solid rgba(201,169,106,.5);border-radius:999px;padding:7px 14px}
   .view-site-link:hover{background:rgba(201,169,106,.12)}
@@ -111,13 +129,18 @@
     </div>
 
     <div id="inquiries-tab" class="tab-panel">
-      <div class="card">
-        <div class="row" style="margin-bottom:0">
-          <div class="hint" style="margin-top:0">Submissions from the public contact form on <code>/site</code> -- newest first. Use "Convert to Opportunity" on a lead to create the real Customer + Site + Opportunity records for it.</div>
-          <div style="flex:0"><button class="btn-secondary" id="inquiries-reload-btn">Reload</button></div>
+      <div class="inbox">
+        <div class="inbox-sidebar">
+          <div class="inbox-sidebar-head">
+            <div class="inbox-sidebar-title">Leads</div>
+            <button class="btn-secondary" id="inquiries-reload-btn">Reload</button>
+          </div>
+          <div id="inquiries-list" class="inbox-list"></div>
+        </div>
+        <div class="inbox-detail" id="inquiry-detail">
+          <div class="empty-note">Select a lead from the list to view details.</div>
         </div>
       </div>
-      <div id="inquiries-list"></div>
     </div>
 
     <div id="design-tab" class="tab-panel">
@@ -294,7 +317,25 @@ async function saveWidgets(originalWidgets) {
 }
 
 var SITE_TYPES = ["HOME", "OFFICE", "FACTORY"];
+var AVATAR_COLORS = ["#c9a96a", "#4d6b7e", "#a0522d", "#5c8a72", "#7a5c8a", "#b0563f", "#3f7a8a"];
+var inquiriesCache = [];
+var selectedInquiryId = null;
 
+function avatarColor(name) {
+  var sum = 0;
+  for (var i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+}
+
+function initials(name) {
+  var trimmed = (name || "").trim();
+  return trimmed ? trimmed[0].toUpperCase() : "?";
+}
+
+/* Messenger-style inbox: this renders the left-hand lead list only. Selecting a row renders
+   the full detail (renderInquiryDetail) in the right-hand pane -- a one-time submission has no
+   back-and-forth thread the way a real chat does, so "conversation" here just means "this
+   lead's full record", not a message history. */
 async function loadInquiries() {
   var list = document.getElementById("inquiries-list");
   list.innerHTML = '<div class="empty-note">Loading…</div>';
@@ -304,76 +345,111 @@ async function loadInquiries() {
     document.getElementById("inquiry-count").textContent = "";
     return;
   }
-  var inquiries = await res.json();
-  document.getElementById("inquiry-count").textContent = inquiries.length ? "(" + inquiries.length + ")" : "";
+  inquiriesCache = await res.json();
+  document.getElementById("inquiry-count").textContent = inquiriesCache.length ? "(" + inquiriesCache.length + ")" : "";
 
-  if (!inquiries.length) {
+  if (!inquiriesCache.length) {
     list.innerHTML = '<div class="empty-note">No inquiries yet.</div>';
+    document.getElementById("inquiry-detail").innerHTML = '<div class="empty-note">Select a lead from the list to view details.</div>';
     return;
   }
 
-  list.innerHTML = inquiries.map(function (i) {
-    var when = new Date(i.created_at).toLocaleString();
-    var badge = i.converted_to_opportunity_id
-      ? '<span class="inquiry-badge converted">Converted</span>'
-      : '<span class="inquiry-badge new">New</span>';
-    var meta = [];
-    if (i.phone) meta.push('<span><b>Phone</b>' + escapeHtml(i.phone) + '</span>');
-    if (i.email) meta.push('<span><b>Email</b>' + escapeHtml(i.email) + '</span>');
-    if (i.service_interest) meta.push('<span><b>Service</b>' + escapeHtml(i.service_interest) + '</span>');
-    if (i.source_page) meta.push('<span><b>Page</b>' + escapeHtml(i.source_page) + '</span>');
-    var actions = i.converted_to_opportunity_id
-      ? ""
-      : (
-          '<div class="inquiry-actions">' +
-            '<button class="btn-secondary convert-btn" data-inquiry-id="' + i.id + '">Convert to Opportunity</button>' +
-          '</div>' +
-          '<div class="inquiry-convert-form" id="convert-form-' + i.id + '" hidden>' +
-            '<div class="row">' +
-              '<div><label>Customer name</label><input class="convert-customer-name" value="' + escapeHtml(i.name) + '"/></div>' +
-              '<div><label>Site type</label><select class="convert-site-type">' +
-                SITE_TYPES.map(function (t) { return '<option value="' + t + '">' + t + '</option>'; }).join("") +
-              '</select></div>' +
-            '</div>' +
-            '<div class="row">' +
-              '<div><label>Site name</label><input class="convert-site-name" placeholder="e.g. ' + escapeHtml(i.name) + ' Factory"/></div>' +
-              '<div><label>Site address (optional)</label><input class="convert-site-address"/></div>' +
-            '</div>' +
-            '<button class="btn-primary convert-submit-btn" data-inquiry-id="' + i.id + '">Create Customer + Site + Opportunity</button>' +
-            '<button class="btn-secondary convert-cancel-btn" data-inquiry-id="' + i.id + '">Cancel</button>' +
-            '<div class="convert-status" id="convert-status-' + i.id + '"></div>' +
-          '</div>'
-        );
+  list.innerHTML = inquiriesCache.map(function (i) {
+    var when = new Date(i.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    var unread = !i.converted_to_opportunity_id;
+    var preview = i.message || i.service_interest || "(no message)";
     return (
-      '<div class="inquiry-card">' +
-        '<div class="inquiry-head"><div class="inquiry-name">' + escapeHtml(i.name) + '</div>' + badge + '<div class="inquiry-time">' + escapeHtml(when) + '</div></div>' +
-        (meta.length ? '<div class="inquiry-meta">' + meta.join("") + '</div>' : "") +
-        (i.message ? '<div class="inquiry-message">' + escapeHtml(i.message) + '</div>' : "") +
-        actions +
-      '</div>'
+      '<button class="inbox-list-item' + (unread ? ' unread' : '') + (i.id === selectedInquiryId ? ' active' : '') + '" data-inquiry-id="' + i.id + '">' +
+        '<div class="inbox-avatar" style="background:' + avatarColor(i.name) + '">' + escapeHtml(initials(i.name)) + '</div>' +
+        '<div class="inbox-list-item-body">' +
+          '<div class="inbox-list-item-top"><span class="inbox-list-item-name">' + escapeHtml(i.name) + '</span><span class="inbox-list-item-time">' + when + '</span></div>' +
+          '<div class="inbox-list-item-preview">' + escapeHtml(preview) + '</div>' +
+        '</div>' +
+        (unread ? '<div class="inbox-unread-dot"></div>' : "") +
+      '</button>'
     );
   }).join("");
 
-  document.querySelectorAll(".convert-btn").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      document.getElementById("convert-form-" + btn.dataset.inquiryId).hidden = false;
-      btn.hidden = true;
+  list.querySelectorAll(".inbox-list-item").forEach(function (btn) {
+    btn.addEventListener("click", function () { selectInquiry(btn.dataset.inquiryId); });
+  });
+
+  // Keep the detail pane in sync after a reload (e.g. right after a conversion) if the
+  // previously selected lead is still there.
+  if (selectedInquiryId && inquiriesCache.some(function (i) { return i.id === selectedInquiryId; })) {
+    renderInquiryDetail(selectedInquiryId);
+  }
+}
+
+function selectInquiry(inquiryId) {
+  selectedInquiryId = inquiryId;
+  document.querySelectorAll(".inbox-list-item").forEach(function (btn) {
+    btn.classList.toggle("active", btn.dataset.inquiryId === inquiryId);
+  });
+  renderInquiryDetail(inquiryId);
+}
+
+function renderInquiryDetail(inquiryId) {
+  var i = inquiriesCache.find(function (x) { return x.id === inquiryId; });
+  var detail = document.getElementById("inquiry-detail");
+  if (!i) { detail.innerHTML = '<div class="empty-note">Select a lead from the list to view details.</div>'; return; }
+
+  var when = new Date(i.created_at).toLocaleString();
+  var badge = i.converted_to_opportunity_id
+    ? '<span class="inquiry-badge converted">Converted</span>'
+    : '<span class="inquiry-badge new">New</span>';
+  var meta = [];
+  if (i.phone) meta.push('<span><b>Phone</b>' + escapeHtml(i.phone) + '</span>');
+  if (i.email) meta.push('<span><b>Email</b>' + escapeHtml(i.email) + '</span>');
+  if (i.service_interest) meta.push('<span><b>Service</b>' + escapeHtml(i.service_interest) + '</span>');
+  if (i.source_page) meta.push('<span><b>Page</b>' + escapeHtml(i.source_page) + '</span>');
+
+  var actions = i.converted_to_opportunity_id
+    ? ""
+    : (
+        '<div class="inquiry-actions">' +
+          '<button class="btn-secondary" id="convert-btn">Convert to Opportunity</button>' +
+        '</div>' +
+        '<div class="inquiry-convert-form" id="convert-form" hidden>' +
+          '<div class="row">' +
+            '<div><label>Customer name</label><input class="convert-customer-name" value="' + escapeHtml(i.name) + '"/></div>' +
+            '<div><label>Site type</label><select class="convert-site-type">' +
+              SITE_TYPES.map(function (t) { return '<option value="' + t + '">' + t + '</option>'; }).join("") +
+            '</select></div>' +
+          '</div>' +
+          '<div class="row">' +
+            '<div><label>Site name</label><input class="convert-site-name" placeholder="e.g. ' + escapeHtml(i.name) + ' Factory"/></div>' +
+            '<div><label>Site address (optional)</label><input class="convert-site-address"/></div>' +
+          '</div>' +
+          '<button class="btn-primary" id="convert-submit-btn">Create Customer + Site + Opportunity</button>' +
+          '<button class="btn-secondary" id="convert-cancel-btn">Cancel</button>' +
+          '<div class="convert-status" id="convert-status"></div>' +
+        '</div>'
+      );
+
+  detail.innerHTML =
+    '<div class="inbox-detail-head"><div class="inbox-detail-name">' + escapeHtml(i.name) + '</div>' + badge + '</div>' +
+    '<div class="inquiry-time">' + escapeHtml(when) + '</div>' +
+    (meta.length ? '<div class="inquiry-meta">' + meta.join("") + '</div>' : "") +
+    (i.message ? '<div class="inquiry-message">' + escapeHtml(i.message) + '</div>' : "") +
+    actions;
+
+  if (!i.converted_to_opportunity_id) {
+    document.getElementById("convert-btn").addEventListener("click", function () {
+      document.getElementById("convert-form").hidden = false;
+      document.getElementById("convert-btn").hidden = true;
     });
-  });
-  document.querySelectorAll(".convert-cancel-btn").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      document.getElementById("convert-form-" + btn.dataset.inquiryId).hidden = true;
-      document.querySelector('.convert-btn[data-inquiry-id="' + btn.dataset.inquiryId + '"]').hidden = false;
+    document.getElementById("convert-cancel-btn").addEventListener("click", function () {
+      document.getElementById("convert-form").hidden = true;
+      document.getElementById("convert-btn").hidden = false;
     });
-  });
-  document.querySelectorAll(".convert-submit-btn").forEach(function (btn) {
-    btn.addEventListener("click", function () { convertInquiry(btn.dataset.inquiryId); });
-  });
+    document.getElementById("convert-submit-btn").addEventListener("click", function () { convertInquiry(i.id); });
+  }
 }
 
 async function convertInquiry(inquiryId) {
-  var form = document.getElementById("convert-form-" + inquiryId);
-  var statusEl = document.getElementById("convert-status-" + inquiryId);
+  var form = document.getElementById("convert-form");
+  var statusEl = document.getElementById("convert-status");
   var customerName = form.querySelector(".convert-customer-name").value.trim();
   var siteType = form.querySelector(".convert-site-type").value;
   var siteName = form.querySelector(".convert-site-name").value.trim();
