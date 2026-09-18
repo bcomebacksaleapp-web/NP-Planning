@@ -27,6 +27,18 @@ def test_login_rejects_invalid_credentials(session, client):
     assert response.status_code == 401
 
 
+def test_login_locks_out_after_3_failed_attempts(session, client):
+    user = _make_user(session)
+    for _ in range(3):
+        assert client.post("/auth/login", json={"email": user.email, "password": "wrong"}).status_code == 401
+
+    response = client.post(
+        "/auth/login", json={"email": user.email, "password": "correct-horse-battery-staple"}
+    )
+    assert response.status_code == 401
+    assert "locked" in response.json()["detail"]
+
+
 def test_logout_revokes_the_token(session, client):
     user = _make_user(session)
     token = client.post(

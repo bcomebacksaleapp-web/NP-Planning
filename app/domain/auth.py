@@ -22,6 +22,13 @@ SESSION_DURATION_HOURS = 12
 MAX_PASSWORD_BYTES = 72  # bcrypt silently ignores anything beyond this -- reject rather than
 # accept a password that doesn't fully count, which is worse than just saying so up front.
 
+# Brute-force protection: 3 wrong passwords in a row locks the account for LOCKOUT_MINUTES.
+# Scoped per-account (not per-IP) since this is an internal staff system with a small, known
+# set of accounts, not a public signup form where account enumeration via lockout messaging
+# would matter the way it does for login()'s timing-attack defense below.
+LOCKOUT_THRESHOLD = 3
+LOCKOUT_MINUTES = 15
+
 # A precomputed hash of a value nobody can ever type, used only to give login() something to
 # bcrypt-compare against when the email doesn't match a real user (see the timing-attack note
 # on login() below). Never used to authenticate anyone.
@@ -78,17 +85,43 @@ def login(session: Session, email: str, plain_password: str) -> str:
     practice, letting an attacker enumerate valid emails purely by timing the response. Real
     users/hashes still go through verify_password unchanged; only the "nothing to compare
     against" case gets a decoy comparison instead of skipping the work.
+
+    Brute-force lockout: a real user's wrong-password attempts are counted on the User row
+    itself; hitting LOCKOUT_THRESHOLD locks the account for LOCKOUT_MINUTES regardless of
+    whether the *next* attempt would have been correct. This check runs before the bcrypt
+    comparison (skip the work, we're rejecting either way) and deliberately returns a distinct
+    "account locked" message -- unlike the not-found/wrong-password case above, revealing that a
+    lockout is in effect is the intended, standard behavior of a lockout feature, not a leak.
     """
     user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
+
+    if user is not None and user.locked_until is not None and _as_aware_utc(user.locked_until) > utcnow():
+        remaining_seconds = (_as_aware_utc(user.locked_until) - utcnow()).total_seconds()
+        minutes = max(1, int(remaining_seconds // 60) + 1)
+        raise InvalidCredentialsError(
+            f"Account locked after too many failed login attempts. Try again in {minutes} minute(s)."
+        )
+
     password_hash = user.password_hash if user is not None and user.password_hash is not None else _DUMMY_HASH
     password_ok = verify_password(plain_password, password_hash)
 
     if user is None or user.password_hash is None or not password_ok:
+        if user is not None and user.password_hash is not None:
+            user.failed_login_attempts += 1
+            if user.failed_login_attempts >= LOCKOUT_THRESHOLD:
+                user.locked_until = utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+                user.failed_login_attempts = 0
+            session.flush()
         raise InvalidCredentialsError("Invalid email or password")
     if user.archived_at is not None:
         raise InvalidCredentialsError("Account is archived")
     if not user.is_active:
         raise InvalidCredentialsError("Account is inactive")
+
+    # A successful login clears any accumulated failed-attempt count -- 2 wrong passwords
+    # followed by the correct one is not "on the way to a lockout", it's just a typo recovered.
+    user.failed_login_attempts = 0
+    user.locked_until = None
 
     raw_token = secrets.token_urlsafe(32)
     session.add(

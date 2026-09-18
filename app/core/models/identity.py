@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, utcnow
@@ -69,6 +69,12 @@ class User(Base):
     # required". Never the plain password, only bcrypt's own salted hash.
     password_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    # Login lockout (brute-force protection) -- failed_login_attempts resets to 0 on any
+    # successful login; once it hits LOCKOUT_THRESHOLD (app.domain.auth), locked_until is set
+    # and login() refuses even a correct password until that time passes. Ephemeral security
+    # state, not business history, so it's mutated in place rather than revisioned.
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
     # Archive, never hard-delete, per platform Law 5 -- NULL means active/not archived.

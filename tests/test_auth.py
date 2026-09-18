@@ -154,6 +154,81 @@ def test_set_password_rejects_passwords_bcrypt_would_silently_truncate(session):
         set_password(session, user, "a" * 73)
 
 
+def test_login_locks_account_after_3_failed_attempts(session):
+    user = _make_user(session)
+
+    for _ in range(3):
+        with pytest.raises(InvalidCredentialsError):
+            login(session, user.email, "wrong-password")
+    session.commit()
+
+    # Even the CORRECT password is refused once locked -- lockout doesn't just count wrong
+    # attempts, it blocks the account outright until the cooldown passes.
+    with pytest.raises(InvalidCredentialsError, match="locked"):
+        login(session, user.email, "correct-horse-battery-staple")
+
+
+def test_login_does_not_lock_before_the_threshold(session):
+    user = _make_user(session)
+
+    for _ in range(2):
+        with pytest.raises(InvalidCredentialsError):
+            login(session, user.email, "wrong-password")
+    session.commit()
+
+    token = login(session, user.email, "correct-horse-battery-staple")
+    assert isinstance(token, str)
+
+
+def test_successful_login_resets_the_failed_attempt_counter(session):
+    user = _make_user(session)
+
+    with pytest.raises(InvalidCredentialsError):
+        login(session, user.email, "wrong-password")
+    with pytest.raises(InvalidCredentialsError):
+        login(session, user.email, "wrong-password")
+    login(session, user.email, "correct-horse-battery-staple")
+    session.commit()
+    assert user.failed_login_attempts == 0
+
+    # 2 more wrong attempts now should NOT lock -- the earlier 2 were wiped by the success above,
+    # so this is only the 2nd/3rd of a fresh streak, not the 4th/5th overall.
+    with pytest.raises(InvalidCredentialsError):
+        login(session, user.email, "wrong-password")
+    token = login(session, user.email, "correct-horse-battery-staple")
+    assert isinstance(token, str)
+
+
+def test_lockout_expires_after_the_cooldown_window(session):
+    from datetime import timedelta
+
+    from app.core.db import utcnow
+
+    user = _make_user(session)
+    for _ in range(3):
+        with pytest.raises(InvalidCredentialsError):
+            login(session, user.email, "wrong-password")
+    session.commit()
+
+    # Simulate the cooldown having already elapsed rather than sleeping real time in a test.
+    user.locked_until = utcnow() - timedelta(seconds=1)
+    session.commit()
+
+    token = login(session, user.email, "correct-horse-battery-staple")
+    assert isinstance(token, str)
+
+
+def test_lockout_message_reports_remaining_minutes(session):
+    user = _make_user(session)
+    for _ in range(3):
+        with pytest.raises(InvalidCredentialsError):
+            login(session, user.email, "wrong-password")
+    session.commit()
+
+    with pytest.raises(InvalidCredentialsError, match=r"\d+ minute"):
+        login(session, user.email, "correct-horse-battery-staple")
+
+
 def test_expired_session_is_rejected(session):
     """Locks in the timezone-comparison fix: SQLite returns a naive datetime for
     expires_at even though it was written as UTC-aware, and comparing that against a fresh
