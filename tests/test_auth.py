@@ -154,6 +154,28 @@ def test_set_password_rejects_passwords_bcrypt_would_silently_truncate(session):
         set_password(session, user, "a" * 73)
 
 
+def test_login_warns_how_many_attempts_remain(session):
+    user = _make_user(session)
+
+    with pytest.raises(InvalidCredentialsError, match="2 attempt"):
+        login(session, user.email, "wrong-password")
+    with pytest.raises(InvalidCredentialsError, match="1 attempt"):
+        login(session, user.email, "wrong-password")
+    # The 3rd attempt triggers the lockout itself -- the message switches to "locked", not
+    # "0 attempts remaining".
+    with pytest.raises(InvalidCredentialsError, match="locked"):
+        login(session, user.email, "wrong-password")
+
+
+def test_login_does_not_warn_remaining_attempts_for_an_unknown_email(session):
+    """The remaining-attempts count is only meaningful (and only revealed) for a real account --
+    counting attempts against an email that doesn't exist would itself leak that the email is
+    NOT registered, the mirror image of the problem this avoids for real accounts."""
+    with pytest.raises(InvalidCredentialsError) as exc_info:
+        login(session, "nobody@example.com", "whatever")
+    assert "attempt" not in str(exc_info.value)
+
+
 def test_login_locks_account_after_3_failed_attempts(session):
     user = _make_user(session)
 

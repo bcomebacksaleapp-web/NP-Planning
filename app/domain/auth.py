@@ -84,14 +84,19 @@ def login(session: Session, email: str, plain_password: str) -> str:
     made an unknown email respond ~160x faster than a known one with a wrong password in
     practice, letting an attacker enumerate valid emails purely by timing the response. Real
     users/hashes still go through verify_password unchanged; only the "nothing to compare
-    against" case gets a decoy comparison instead of skipping the work.
+    against" case gets a decoy comparison instead of skipping the work. This timing symmetry is
+    still real and still tested (see test_login_takes_the_same_time_...), but note it no longer
+    fully hides account existence by itself -- see the next paragraph.
 
     Brute-force lockout: a real user's wrong-password attempts are counted on the User row
     itself; hitting LOCKOUT_THRESHOLD locks the account for LOCKOUT_MINUTES regardless of
-    whether the *next* attempt would have been correct. This check runs before the bcrypt
-    comparison (skip the work, we're rejecting either way) and deliberately returns a distinct
-    "account locked" message -- unlike the not-found/wrong-password case above, revealing that a
-    lockout is in effect is the intended, standard behavior of a lockout feature, not a leak.
+    whether the *next* attempt would have been correct. The locked-out check runs before the
+    bcrypt comparison (skip the work, we're rejecting either way) and returns a distinct "account
+    locked" message. A wrong-but-not-yet-locking attempt on a real account also now says how many
+    attempts remain -- a deliberate, requested UX tradeoff: this message content DOES reveal that
+    the account exists (unlike the timing, which still doesn't), acceptable here because this is
+    an internal staff system with a small, known set of accounts, not a public signup surface
+    where account enumeration is a live concern.
     """
     user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
 
@@ -111,7 +116,15 @@ def login(session: Session, email: str, plain_password: str) -> str:
             if user.failed_login_attempts >= LOCKOUT_THRESHOLD:
                 user.locked_until = utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
                 user.failed_login_attempts = 0
+                session.flush()
+                raise InvalidCredentialsError(
+                    f"Account locked after too many failed login attempts. Try again in {LOCKOUT_MINUTES} minute(s)."
+                )
+            remaining = LOCKOUT_THRESHOLD - user.failed_login_attempts
             session.flush()
+            raise InvalidCredentialsError(
+                f"Invalid email or password. {remaining} attempt(s) remaining before your account is locked."
+            )
         raise InvalidCredentialsError("Invalid email or password")
     if user.archived_at is not None:
         raise InvalidCredentialsError("Account is archived")
