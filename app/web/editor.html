@@ -79,9 +79,12 @@
   .inbox-list-item-preview{font-size:.8rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
   .inbox-list-item.unread .inbox-list-item-name,.inbox-list-item.unread .inbox-list-item-preview{color:var(--text);font-weight:600}
   .inbox-unread-dot{width:8px;height:8px;border-radius:999px;background:var(--sand);flex-shrink:0;margin-top:5px}
+  .inbox-list-item.archived{opacity:.55}
   .inbox-detail{flex:1;overflow-y:auto;padding:24px 28px}
   .inbox-detail-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:4px}
+  .inbox-detail-name-row{display:flex;align-items:center;gap:10px}
   .inbox-detail-name{font-weight:800;font-size:1.15rem}
+  .inquiry-badge.archived{background:#e6e6e3;color:#5c5c58}
   .empty-note{color:var(--muted);font-size:.88rem;text-align:center;padding:30px 0}
   .view-site-link{color:var(--sand);font-size:.85rem;font-weight:700;text-decoration:none;border:1px solid rgba(201,169,106,.5);border-radius:999px;padding:7px 14px}
   .view-site-link:hover{background:rgba(201,169,106,.12)}
@@ -133,6 +136,7 @@
         <div class="inbox-sidebar">
           <div class="inbox-sidebar-head">
             <div class="inbox-sidebar-title">Leads</div>
+            <label class="design-toggle"><input type="checkbox" id="show-archived-toggle">Archived</label>
             <button class="btn-secondary" id="inquiries-reload-btn">Reload</button>
           </div>
           <div id="inquiries-list" class="inbox-list"></div>
@@ -333,6 +337,12 @@ var SITE_TYPES = ["HOME", "OFFICE", "FACTORY"];
 var AVATAR_COLORS = ["#c9a96a", "#4d6b7e", "#a0522d", "#5c8a72", "#7a5c8a", "#b0563f", "#3f7a8a"];
 var inquiriesCache = [];
 var selectedInquiryId = null;
+var showArchived = false;
+
+document.getElementById("show-archived-toggle").addEventListener("change", function (e) {
+  showArchived = e.target.checked;
+  loadInquiries();
+});
 
 function avatarColor(name) {
   var sum = 0;
@@ -352,7 +362,8 @@ function initials(name) {
 async function loadInquiries() {
   var list = document.getElementById("inquiries-list");
   list.innerHTML = '<div class="empty-note">Loading…</div>';
-  var res = await fetch(API_BASE + "/inquiries", { headers: headers() });
+  var url = API_BASE + "/inquiries" + (showArchived ? "?include_archived=true" : "");
+  var res = await fetch(url, { headers: headers() });
   if (!res.ok) {
     list.innerHTML = '<div class="status err">' + res.status + ": " + await apiErrorText(res) + '</div>';
     document.getElementById("inquiry-count").textContent = "";
@@ -362,17 +373,17 @@ async function loadInquiries() {
   document.getElementById("inquiry-count").textContent = inquiriesCache.length ? "(" + inquiriesCache.length + ")" : "";
 
   if (!inquiriesCache.length) {
-    list.innerHTML = '<div class="empty-note">No inquiries yet.</div>';
+    list.innerHTML = '<div class="empty-note">' + (showArchived ? "No archived leads." : "No inquiries yet.") + '</div>';
     document.getElementById("inquiry-detail").innerHTML = '<div class="empty-note">Select a lead from the list to view details.</div>';
     return;
   }
 
   list.innerHTML = inquiriesCache.map(function (i) {
     var when = new Date(i.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-    var unread = !i.converted_to_opportunity_id;
+    var unread = !i.converted_to_opportunity_id && !i.archived;
     var preview = i.message || i.service_interest || "(no message)";
     return (
-      '<button class="inbox-list-item' + (unread ? ' unread' : '') + (i.id === selectedInquiryId ? ' active' : '') + '" data-inquiry-id="' + i.id + '">' +
+      '<button class="inbox-list-item' + (unread ? ' unread' : '') + (i.archived ? ' archived' : '') + (i.id === selectedInquiryId ? ' active' : '') + '" data-inquiry-id="' + i.id + '">' +
         '<div class="inbox-avatar" style="background:' + avatarColor(i.name) + '">' + escapeHtml(initials(i.name)) + '</div>' +
         '<div class="inbox-list-item-body">' +
           '<div class="inbox-list-item-top"><span class="inbox-list-item-name">' + escapeHtml(i.name) + '</span><span class="inbox-list-item-time">' + when + '</span></div>' +
@@ -387,10 +398,15 @@ async function loadInquiries() {
     btn.addEventListener("click", function () { selectInquiry(btn.dataset.inquiryId); });
   });
 
-  // Keep the detail pane in sync after a reload (e.g. right after a conversion) if the
-  // previously selected lead is still there.
+  // Keep the detail pane in sync after a reload (e.g. right after a conversion, or after
+  // archiving the currently-open lead out of view) -- re-render if the previously selected lead
+  // is still in this list, otherwise fall back to the empty state rather than leaving stale
+  // detail (with, say, an Unarchive button) on screen for a lead no longer shown.
   if (selectedInquiryId && inquiriesCache.some(function (i) { return i.id === selectedInquiryId; })) {
     renderInquiryDetail(selectedInquiryId);
+  } else {
+    selectedInquiryId = null;
+    document.getElementById("inquiry-detail").innerHTML = '<div class="empty-note">Select a lead from the list to view details.</div>';
   }
 }
 
@@ -408,9 +424,12 @@ function renderInquiryDetail(inquiryId) {
   if (!i) { detail.innerHTML = '<div class="empty-note">Select a lead from the list to view details.</div>'; return; }
 
   var when = new Date(i.created_at).toLocaleString();
-  var badge = i.converted_to_opportunity_id
-    ? '<span class="inquiry-badge converted">Converted</span>'
-    : '<span class="inquiry-badge new">New</span>';
+  var badge =
+    (i.converted_to_opportunity_id ? '<span class="inquiry-badge converted">Converted</span>' : '<span class="inquiry-badge new">New</span>') +
+    (i.archived ? '<span class="inquiry-badge archived">Archived</span>' : "");
+  var archiveBtn = i.archived
+    ? '<button class="btn-secondary" id="archive-toggle-btn">Unarchive</button>'
+    : '<button class="btn-secondary" id="archive-toggle-btn">Archive</button>';
   var meta = [];
   if (i.phone) meta.push('<span><b>Phone</b>' + escapeHtml(i.phone) + '</span>');
   if (i.email) meta.push('<span><b>Email</b>' + escapeHtml(i.email) + '</span>');
@@ -441,11 +460,15 @@ function renderInquiryDetail(inquiryId) {
       );
 
   detail.innerHTML =
-    '<div class="inbox-detail-head"><div class="inbox-detail-name">' + escapeHtml(i.name) + '</div>' + badge + '</div>' +
+    '<div class="inbox-detail-head"><div class="inbox-detail-name-row"><div class="inbox-detail-name">' + escapeHtml(i.name) + '</div>' + badge + '</div>' + archiveBtn + '</div>' +
     '<div class="inquiry-time">' + escapeHtml(when) + '</div>' +
     (meta.length ? '<div class="inquiry-meta">' + meta.join("") + '</div>' : "") +
     (i.message ? '<div class="inquiry-message">' + escapeHtml(i.message) + '</div>' : "") +
     actions;
+
+  document.getElementById("archive-toggle-btn").addEventListener("click", function () {
+    if (i.archived) { unarchiveInquiry(i.id); } else { archiveInquiry(i.id); }
+  });
 
   if (!i.converted_to_opportunity_id) {
     document.getElementById("convert-btn").addEventListener("click", function () {
@@ -458,6 +481,20 @@ function renderInquiryDetail(inquiryId) {
     });
     document.getElementById("convert-submit-btn").addEventListener("click", function () { convertInquiry(i.id); });
   }
+}
+
+async function archiveInquiry(inquiryId) {
+  var res = await fetch(API_BASE + "/inquiries/" + inquiryId + "/archive", { method: "POST", headers: headers() });
+  if (!res.ok) { alert("Could not archive: " + await apiErrorText(res)); return; }
+  // Archiving removes it from the default (non-archived) view -- nothing left to select there.
+  if (!showArchived) selectedInquiryId = null;
+  loadInquiries();
+}
+
+async function unarchiveInquiry(inquiryId) {
+  var res = await fetch(API_BASE + "/inquiries/" + inquiryId + "/unarchive", { method: "POST", headers: headers() });
+  if (!res.ok) { alert("Could not unarchive: " + await apiErrorText(res)); return; }
+  loadInquiries();
 }
 
 async function convertInquiry(inquiryId) {

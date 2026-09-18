@@ -36,10 +36,15 @@ def create_inquiry(
     return inquiry
 
 
-def list_inquiries(session) -> list[WebsiteInquiry]:
+def list_inquiries(session, include_archived: bool = False) -> list[WebsiteInquiry]:
     """Staff-side triage queue -- newest first, so a new submission is immediately visible at
-    the top rather than requiring anyone to know to scroll."""
-    return list(session.execute(select(WebsiteInquiry).order_by(WebsiteInquiry.created_at.desc())).scalars())
+    the top rather than requiring anyone to know to scroll. Archived leads (spam, duplicate
+    test submissions, dead ends) are hidden by default, same as WebsitePage/WebsiteBranch listing
+    patterns elsewhere -- pass include_archived=True for the inbox's "show archived" view."""
+    query = select(WebsiteInquiry).order_by(WebsiteInquiry.created_at.desc())
+    if not include_archived:
+        query = query.where(WebsiteInquiry.archived_at.is_(None))
+    return list(session.execute(query).scalars())
 
 
 def convert_inquiry_to_opportunity(

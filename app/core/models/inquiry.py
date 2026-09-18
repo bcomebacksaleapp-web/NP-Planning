@@ -30,3 +30,6 @@ class WebsiteInquiry(Base):
     converted_to_opportunity_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("opportunities.id"), nullable=True
     )
+    # Archive, never hard-delete, per platform Law 5 (app.domain.archiving) -- lets staff clear
+    # spam/test/dead leads out of the inbox's default view without destroying the record.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

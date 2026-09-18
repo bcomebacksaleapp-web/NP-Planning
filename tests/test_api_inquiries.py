@@ -164,3 +164,56 @@ def test_convert_inquiry_reuses_existing_customer_by_name(session, client):
 
     assert first["customer_id"] == second["customer_id"]
     assert first["site_id"] != second["site_id"]
+
+
+def test_archive_inquiry_requires_permission(client):
+    inquiry_id = client.post("/inquiries", json={"name": "Somchai"}).json()["id"]
+    assert client.post(f"/inquiries/{inquiry_id}/archive").status_code == 401
+
+
+def test_archive_inquiry_hides_it_from_default_list_but_not_include_archived(session, client):
+    inquiry_id = client.post("/inquiries", json={"name": "Spam Lead"}).json()["id"]
+    token = _login(session, client, "DRAFT")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    archive_response = client.post(f"/inquiries/{inquiry_id}/archive", headers=headers)
+    assert archive_response.status_code == 200
+    assert archive_response.json()["archived"] is True
+
+    default_list = client.get("/inquiries", headers=headers).json()
+    assert inquiry_id not in [i["id"] for i in default_list]
+
+    full_list = client.get("/inquiries?include_archived=true", headers=headers).json()
+    assert inquiry_id in [i["id"] for i in full_list]
+
+
+def test_archive_inquiry_is_idempotent(session, client):
+    inquiry_id = client.post("/inquiries", json={"name": "Somchai"}).json()["id"]
+    token = _login(session, client, "DRAFT")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    assert client.post(f"/inquiries/{inquiry_id}/archive", headers=headers).status_code == 200
+    assert client.post(f"/inquiries/{inquiry_id}/archive", headers=headers).status_code == 200
+
+
+def test_unarchive_inquiry_returns_it_to_the_default_list(session, client):
+    inquiry_id = client.post("/inquiries", json={"name": "Somchai"}).json()["id"]
+    token = _login(session, client, "DRAFT")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    client.post(f"/inquiries/{inquiry_id}/archive", headers=headers)
+    unarchive_response = client.post(f"/inquiries/{inquiry_id}/unarchive", headers=headers)
+    assert unarchive_response.status_code == 200
+    assert unarchive_response.json()["archived"] is False
+
+    default_list = client.get("/inquiries", headers=headers).json()
+    assert inquiry_id in [i["id"] for i in default_list]
+
+
+def test_archive_inquiry_404_when_missing(session, client):
+    token = _login(session, client, "DRAFT")
+    headers = {"Authorization": f"Bearer {token}"}
+    response = client.post(
+        "/inquiries/00000000-0000-0000-0000-000000000000/archive", headers=headers
+    )
+    assert response.status_code == 404

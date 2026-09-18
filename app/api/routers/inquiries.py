@@ -9,6 +9,7 @@ from app.api.deps import require_permission
 from app.core.db import get_db
 from app.core.models.inquiry import WebsiteInquiry
 from app.core.models.party import SITE_TYPES
+from app.domain.archiving import archive, unarchive
 from app.domain.inquiries import InquiryAlreadyConvertedError, convert_inquiry_to_opportunity, create_inquiry, list_inquiries
 
 router = APIRouter(prefix="/inquiries", tags=["inquiries"])
@@ -33,6 +34,7 @@ class InquiryResponse(BaseModel):
     source_page: str | None
     converted_to_opportunity_id: uuid.UUID | None
     created_at: datetime
+    archived: bool
 
 
 def _response(inquiry) -> InquiryResponse:
@@ -40,7 +42,7 @@ def _response(inquiry) -> InquiryResponse:
         id=inquiry.id, name=inquiry.name, phone=inquiry.phone, email=inquiry.email,
         service_interest=inquiry.service_interest, message=inquiry.message,
         source_page=inquiry.source_page, converted_to_opportunity_id=inquiry.converted_to_opportunity_id,
-        created_at=inquiry.created_at,
+        created_at=inquiry.created_at, archived=inquiry.archived_at is not None,
     )
 
 
@@ -58,9 +60,10 @@ def create_inquiry_route(body: CreateInquiryRequest, db: Session = Depends(get_d
 
 @router.get("", response_model=list[InquiryResponse])
 def list_inquiries_route(
+    include_archived: bool = False,
     db: Session = Depends(get_db), user=Depends(require_permission("website_inquiry", "READ")),
 ) -> list[InquiryResponse]:
-    return [_response(i) for i in list_inquiries(db)]
+    return [_response(i) for i in list_inquiries(db, include_archived=include_archived)]
 
 
 class ConvertInquiryRequest(BaseModel):
@@ -104,3 +107,31 @@ def convert_inquiry_route(
     return ConvertInquiryResponse(
         inquiry=_response(inquiry), customer_id=customer.id, site_id=site.id, opportunity_id=opportunity.id,
     )
+
+
+@router.post("/{inquiry_id}/archive", response_model=InquiryResponse)
+def archive_inquiry_route(
+    inquiry_id: uuid.UUID, db: Session = Depends(get_db),
+    user=Depends(require_permission("website_inquiry", "DRAFT")),
+) -> InquiryResponse:
+    """Removes a lead from the inbox's default view (spam, a duplicate test submission, a dead
+    end) without deleting it -- Law 5, same as every other archive in this system."""
+    inquiry = db.get(WebsiteInquiry, inquiry_id)
+    if inquiry is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Inquiry not found")
+    archive(db, inquiry, actor_user_id=user.id)
+    db.commit()
+    return _response(inquiry)
+
+
+@router.post("/{inquiry_id}/unarchive", response_model=InquiryResponse)
+def unarchive_inquiry_route(
+    inquiry_id: uuid.UUID, db: Session = Depends(get_db),
+    user=Depends(require_permission("website_inquiry", "DRAFT")),
+) -> InquiryResponse:
+    inquiry = db.get(WebsiteInquiry, inquiry_id)
+    if inquiry is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Inquiry not found")
+    unarchive(db, inquiry, actor_user_id=user.id)
+    db.commit()
+    return _response(inquiry)
