@@ -27,8 +27,15 @@
   .status.ok{background:#dcf5e0;color:#1a6b2c}
   .status.err{background:#fde2e2;color:#a02020}
   .widget-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .widget-head-left{display:flex;align-items:center;gap:10px}
   .widget-type{font-weight:700;font-size:.9rem}
   .widget-order{font-size:.75rem;color:var(--muted)}
+  .drag-handle{cursor:grab;color:var(--muted);font-size:1.1rem;line-height:1;padding:2px 4px;border-radius:4px;user-select:none}
+  .drag-handle:hover{background:var(--paper);color:var(--text)}
+  .drag-handle:active{cursor:grabbing}
+  .widget-card.dragging{opacity:.4}
+  .widget-card.drag-over-top{box-shadow:inset 0 2px 0 var(--sand)}
+  .widget-card.drag-over-bottom{box-shadow:inset 0 -2px 0 var(--sand)}
   #login-view,#editor-view{display:none}
   .hint{font-size:.78rem;color:var(--muted);margin-top:6px}
   .tabs{display:flex;gap:6px;margin-bottom:18px}
@@ -267,22 +274,77 @@ function renderWidgets(revision) {
   container.innerHTML =
     '<div class="card"><div class="widget-head"><div class="widget-type">Revision ' + revision.revision_number + '</div>' +
     '<div class="widget-order">' + widgets.length + ' widgets</div></div></div>' +
-    widgets.map(function (w, i) {
-      return (
-        '<div class="card" data-widget-index="' + i + '">' +
-          '<div class="widget-head"><div class="widget-type">' + w.widget_type + '</div><div class="widget-order">order_index: ' + w.order_index + '</div></div>' +
-          '<label>config (JSON)</label>' +
-          '<textarea class="config-input">' + escapeHtml(JSON.stringify(w.config, null, 2)) + '</textarea>' +
-          '<div class="hint">widget_type and order_index are structural (not editable here) -- only config, which is where real content (text, image URLs) lives.</div>' +
-        '</div>'
-      );
-    }).join("") +
+    '<div id="widget-cards">' +
+      widgets.map(function (w, i) {
+        return (
+          '<div class="card widget-card" data-widget-index="' + i + '">' +
+            '<div class="widget-head"><div class="widget-head-left"><span class="drag-handle" draggable="true" title="Drag to reorder">⡖</span><div class="widget-type">' + w.widget_type + '</div></div><div class="widget-order">order_index: ' + w.order_index + '</div></div>' +
+            '<label>config (JSON)</label>' +
+            '<textarea class="config-input">' + escapeHtml(JSON.stringify(w.config, null, 2)) + '</textarea>' +
+            '<div class="hint">widget_type is structural (not editable here) -- config is where real content (text, image URLs) lives. Drag the ⡖ handle to reorder widgets on the page.</div>' +
+          '</div>'
+        );
+      }).join("") +
+    '</div>' +
     '<div class="card">' +
       '<button class="btn-primary" id="save-btn">Save as new revision</button>' +
       '<div id="save-status"></div>' +
     '</div>';
 
   document.getElementById("save-btn").addEventListener("click", function () { saveWidgets(widgets); });
+  makeWidgetsDraggable();
+}
+
+/* Native HTML5 drag-and-drop, scoped to the drag handle so dragging never fights with text
+   selection inside a card's config textarea. Reordering only touches the DOM (and the visible
+   "order_index: N" labels) at drop time -- saveWidgets reads final order straight from DOM
+   order, so no separate "pending reorder" state needs to be tracked. */
+var draggedWidgetCard = null;
+
+function makeWidgetsDraggable() {
+  var cardsContainer = document.getElementById("widget-cards");
+  cardsContainer.querySelectorAll(".drag-handle").forEach(function (handle) {
+    handle.addEventListener("dragstart", function (e) {
+      draggedWidgetCard = handle.closest(".widget-card");
+      draggedWidgetCard.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    handle.addEventListener("dragend", function () {
+      if (draggedWidgetCard) draggedWidgetCard.classList.remove("dragging");
+      draggedWidgetCard = null;
+      cardsContainer.querySelectorAll(".widget-card").forEach(function (c) {
+        c.classList.remove("drag-over-top", "drag-over-bottom");
+      });
+    });
+  });
+
+  cardsContainer.querySelectorAll(".widget-card").forEach(function (card) {
+    card.addEventListener("dragover", function (e) {
+      if (!draggedWidgetCard || draggedWidgetCard === card) return;
+      e.preventDefault();
+      var rect = card.getBoundingClientRect();
+      var isAfter = (e.clientY - rect.top) > rect.height / 2;
+      card.classList.toggle("drag-over-top", !isAfter);
+      card.classList.toggle("drag-over-bottom", isAfter);
+    });
+    card.addEventListener("dragleave", function () {
+      card.classList.remove("drag-over-top", "drag-over-bottom");
+    });
+    card.addEventListener("drop", function (e) {
+      if (!draggedWidgetCard || draggedWidgetCard === card) return;
+      e.preventDefault();
+      var isAfter = card.classList.contains("drag-over-bottom");
+      card.parentNode.insertBefore(draggedWidgetCard, isAfter ? card.nextSibling : card);
+      card.classList.remove("drag-over-top", "drag-over-bottom");
+      renumberWidgetOrderLabels();
+    });
+  });
+}
+
+function renumberWidgetOrderLabels() {
+  document.querySelectorAll("#widget-cards .widget-card .widget-order").forEach(function (label, i) {
+    label.textContent = "order_index: " + i;
+  });
 }
 
 function escapeHtml(s) {
@@ -304,15 +366,19 @@ async function apiErrorText(res) {
 
 async function saveWidgets(originalWidgets) {
   var statusEl = document.getElementById("save-status");
-  var cards = document.querySelectorAll("[data-widget-index]");
+  // #widget-cards order reflects any drag-and-drop reordering the user just did; data-widget-index
+  // is each card's STABLE position in originalWidgets (set once at render, untouched by dragging
+  // DOM nodes around), so it's what pairs a card back to its widget_type/content_source -- the
+  // loop position `i` here, not that stable index, becomes the new order_index.
+  var cards = document.querySelectorAll("#widget-cards [data-widget-index]");
   var updated = [];
   try {
     cards.forEach(function (card, i) {
       var text = card.querySelector(".config-input").value;
       var config = JSON.parse(text);
-      var original = originalWidgets[i];
+      var original = originalWidgets[parseInt(card.dataset.widgetIndex, 10)];
       updated.push({
-        widget_type: original.widget_type, order_index: original.order_index,
+        widget_type: original.widget_type, order_index: i,
         content_source: original.content_source, config: config
       });
     });
