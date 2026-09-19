@@ -36,7 +36,16 @@ def client(session):
     from app.main import app
 
     def _override_get_db():
-        yield session
+        # Mirror app.core.db.get_db's `finally: db.close()`, which rolls back anything a request
+        # flushed but never committed -- including when the endpoint raised (FastAPI throws the
+        # exception into the generator at the yield, so this must be try/finally, not just code
+        # after the yield). Without this, one shared never-closed Session made a missing
+        # db.commit() invisible to every API test (a login-lockout counter that only ever got
+        # flush()ed passed its tests while silently doing nothing in production).
+        try:
+            yield session
+        finally:
+            session.rollback()
 
     app.dependency_overrides[get_db] = _override_get_db
     try:
